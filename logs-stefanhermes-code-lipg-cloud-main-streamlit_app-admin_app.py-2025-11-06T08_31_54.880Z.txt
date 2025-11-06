@@ -1,0 +1,40 @@
+
+[     UTC     ] Logs for lipg-backend.streamlit.app/
+────────────────────────────────────────────────────────────────────────────────────────
+[08:31:35] 🖥 Provisioning machine...
+[08:31:35] 🎛 Preparing system...
+[08:31:35] ⛓ Spinning up manager process...
+[08:31:34] 🚀 Starting up repository: 'lipg-cloud', branch: 'main', main module: 'streamlit_app/admin_app.py'
+[08:31:34] 🐙 Cloning repository...
+[08:31:34] 🐙 Cloning into '/mount/src/lipg-cloud'...
+
+[08:31:34] 🐙 Cloned repository!
+[08:31:34] 🐙 Pulling code changes from Github...
+[08:31:34] 📦 Processing dependencies...
+[08:31:34] 📦 Apt dependencies were installed from /mount/src/lipg-cloud/packages.txt using apt-get.
+Hit:1 http://deb.debian.org/debian bookworm InRelease
+Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [48.0 kB]
+Get:4 https://packages.microsoft.com/debian/11/prod bullseye InRelease [3650 B]
+Get:5 http://deb.debian.org/debian-security bookworm-security/main amd64 Packages [284 kB]
+Get:6 https://packages.microsoft.com/debian/11/prod bullseye/main arm64 Packages [57.8 kB]
+Get:7 https://packages.microsoft.com/debian/11/prod bullseye/main amd64 Packages [212 kB]
+Fetched 661 kB in 0s (1489 kB/s)
+Reading package lists...[2025-11-06 08:31:36.005046] 
+Reading package lists...[2025-11-06 08:31:36.570376] 
+Building dependency tree...[2025-11-06 08:31:36.730851] 
+Reading state information...[2025-11-06 08:31:36.731187] 
+E: Unable to locate package #
+E: Unable to locate package For
+E: Unable to locate package Streamlit
+E: Unable to locate package Cloud
+E: Unable to locate package deployment
+E: Unable to locate package #[2025-11-06 08:31:36.742919] 
+E: Unable to locate package Add
+E: Unable to locate package any
+E: Unable to locate package system
+E: Unable to locate package packages
+E: Unable to locate package needed
+E: Unable to locate package here
+[08:31:37] ❗️ installer returned a non-zero exit code
+[08:31:37] ❗️ Error during processing dependencies! Please fix the error and push an update, or try restarting the app.
