@@ -9,9 +9,8 @@ import sys
 from datetime import datetime
 import json
 
-# Add parent directory to path for imports (LIPG Cloud folder)
-# This adds "LIPG Cloud" folder to path so shared_utils can be imported
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Ensure we can import from shared_utils when app is at repo root
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from shared_utils.post_generator import generate_ai_post, generate_visual_prompt
 from shared_utils.data_manager import save_post_to_database, get_user_post_history
@@ -47,7 +46,7 @@ except Exception as e:
     button_color = '#17A2B8'
 
 # Get logo path
-_base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_base_dir = os.path.dirname(os.path.abspath(__file__))
 _logo_path = os.path.join(_base_dir, "static", "logo.png")
 _logo_exists = os.path.exists(_logo_path)
 

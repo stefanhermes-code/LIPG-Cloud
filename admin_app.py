@@ -10,8 +10,8 @@ import sys
 from datetime import datetime, timedelta
 import json
 
-# Add parent directory to path for imports (LIPG Cloud folder)
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Ensure we can import from shared_utils when app is at repo root
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from shared_utils.data_manager import (
     get_all_posts, 
@@ -59,7 +59,7 @@ except Exception as e:
     button_color = '#17A2B8'
 
 # Get logo path
-_base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_base_dir = os.path.dirname(os.path.abspath(__file__))
 _logo_path = os.path.join(_base_dir, "static", "logo.png")
 _logo_exists = os.path.exists(_logo_path)
 
