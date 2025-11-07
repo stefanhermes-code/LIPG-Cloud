@@ -167,7 +167,7 @@ if page == "Dashboard":
     
     try:
         # Get statistics
-        stats = get_user_stats()
+        stats = get_user_stats()  # Now uses auth.json, so total_users is correct
         
         col1, col2, col3, col4 = st.columns(4)
         
