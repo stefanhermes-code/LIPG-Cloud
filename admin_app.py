@@ -293,6 +293,14 @@ elif page == "Company Management":
         try:
             companies = get_all_companies()
             if companies:
+                # Clear confirmation state if company was deleted
+                if 'confirm_delete_company' in st.session_state:
+                    # Check if the confirmed company still exists
+                    confirmed_id = st.session_state.confirm_delete_company
+                    if confirmed_id and not any(c['id'] == confirmed_id for c in companies):
+                        # Company was deleted, clear confirmation state
+                        st.session_state.confirm_delete_company = None
+                
                 selected_company_id = st.selectbox("Select Company", 
                                                    [c['id'] for c in companies],
                                                    format_func=lambda x: f"{x} - {next((c['name'] for c in companies if c['id'] == x), 'Unknown')}")
@@ -390,18 +398,29 @@ elif page == "Company Management":
                         
                         with col3:
                             st.subheader("Delete Company")
-                            if st.button("🗑️ Delete Company", type="secondary"):
+                            delete_key = f"delete_company_{selected_company_id}"
+                            
+                            # Show warning if this company is pending deletion
+                            if st.session_state.get('confirm_delete_company') == selected_company_id:
+                                st.warning("⚠️ Click the button again to confirm deletion")
+                            
+                            if st.button("🗑️ Delete Company", type="secondary", key=delete_key):
                                 if st.session_state.get('confirm_delete_company') != selected_company_id:
+                                    # First click - set confirmation
                                     st.session_state.confirm_delete_company = selected_company_id
-                                    st.warning("⚠️ Click again to confirm deletion")
+                                    st.rerun()
                                 else:
+                                    # Second click - actually delete
                                     success, message = delete_company(selected_company_id)
                                     if success:
-                                        st.success(message)
+                                        # Clear confirmation state
                                         st.session_state.confirm_delete_company = None
+                                        st.success(message)
                                         st.rerun()
                                     else:
                                         st.error(message)
+                                        # Clear confirmation on error too
+                                        st.session_state.confirm_delete_company = None
             else:
                 st.info("No companies found. Create your first company in the 'Add New Company' tab.")
         except Exception as e:
