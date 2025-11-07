@@ -164,7 +164,7 @@ if _logo_exists:
         st.markdown(f"""
             <div class="header-container">
                 <div class="header-text">
-                    <h1>💼 {customer_name}</h1>
+                    <h1>{customer_name}</h1>
                     <h2>LinkedIn Post Generator</h2>
                 </div>
             </div>
@@ -173,7 +173,7 @@ else:
     st.markdown(f"""
         <div class="header-container">
             <div class="header-text">
-                <h1>💼 {customer_name}</h1>
+                <h1>{customer_name}</h1>
                 <h2>LinkedIn Post Generator</h2>
             </div>
         </div>
