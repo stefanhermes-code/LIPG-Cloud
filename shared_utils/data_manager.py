@@ -29,11 +29,26 @@ def _load_json_file(filepath):
     if filepath.exists():
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                # Ensure we return a list if data is not a list
+                if not isinstance(data, list):
+                    return []
+                return data
+        except json.JSONDecodeError:
+            # If file is corrupted, return empty list
+            logging.warning(f"JSON file {filepath} is corrupted, returning empty list")
+            return []
         except Exception as e:
             logging.error(f"Error loading {filepath}: {str(e)}")
             return []
-    return []
+    else:
+        # File doesn't exist - create empty file
+        logging.info(f"File {filepath} doesn't exist, creating empty file")
+        try:
+            _save_json_file(filepath, [])
+        except Exception as e:
+            logging.error(f"Error creating {filepath}: {str(e)}")
+        return []
 
 def _save_json_file(filepath, data):
     """Save JSON data to file"""
@@ -274,7 +289,10 @@ def get_user(username):
 def create_user(username, password, enabled=True, email="", tier="Basic", company_id=None, role="User"):
     """Create a new user account"""
     try:
+        # Ensure auth file exists and is a list
         auth_data = _load_json_file(AUTH_FILE)
+        if not isinstance(auth_data, list):
+            auth_data = []
         
         # Check if user already exists
         for user in auth_data:
