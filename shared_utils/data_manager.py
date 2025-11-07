@@ -236,13 +236,16 @@ def get_user(username):
                 # Don't return password
                 user_info = user.copy()
                 user_info.pop('password', None)
+                # Set default tier if not present (for backward compatibility)
+                if 'tier' not in user_info:
+                    user_info['tier'] = 'Basic'
                 return user_info
         return None
     except Exception as e:
         logging.error(f"Error getting user: {str(e)}")
         return None
 
-def create_user(username, password, enabled=True, email=""):
+def create_user(username, password, enabled=True, email="", tier="Basic"):
     """Create a new user account"""
     try:
         auth_data = _load_json_file(AUTH_FILE)
@@ -252,12 +255,18 @@ def create_user(username, password, enabled=True, email=""):
             if user.get('username') == username:
                 return False, "Username already exists"
         
+        # Validate tier
+        valid_tiers = ["Basic", "Standard", "Premium"]
+        if tier not in valid_tiers:
+            tier = "Basic"
+        
         # Create new user
         new_user = {
             "username": username,
             "password": password,  # In production, hash this
             "enabled": enabled,
             "email": email,
+            "tier": tier,
             "created_date": datetime.now().isoformat(),
             "last_login": None
         }
@@ -312,11 +321,14 @@ def get_all_auth_users():
     """Get all authenticated users (without passwords)"""
     try:
         auth_data = _load_json_file(AUTH_FILE)
-        # Remove passwords from response
+        # Remove passwords from response and ensure tier exists (backward compatibility)
         users = []
         for user in auth_data:
             user_info = user.copy()
             user_info.pop('password', None)
+            # Set default tier if not present (for backward compatibility)
+            if 'tier' not in user_info:
+                user_info['tier'] = 'Basic'
             users.append(user_info)
         return users
     except Exception as e:
@@ -336,3 +348,21 @@ def update_last_login(username):
     except Exception as e:
         logging.error(f"Error updating last login: {str(e)}")
         return False
+
+def update_user_tier(username, tier):
+    """Update user tier"""
+    try:
+        valid_tiers = ["Basic", "Standard", "Premium"]
+        if tier not in valid_tiers:
+            return False, f"Invalid tier. Must be one of: {', '.join(valid_tiers)}"
+        
+        auth_data = _load_json_file(AUTH_FILE)
+        for user in auth_data:
+            if user.get('username') == username:
+                user['tier'] = tier
+                _save_json_file(AUTH_FILE, auth_data)
+                return True, f"User tier updated to {tier} successfully"
+        return False, "User not found"
+    except Exception as e:
+        logging.error(f"Error updating user tier: {str(e)}")
+        return False, f"Error updating user tier: {str(e)}"

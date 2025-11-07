@@ -24,6 +24,7 @@ from shared_utils.data_manager import (
     delete_user,
     enable_disable_user,
     update_user_password,
+    update_user_tier,
     get_user
 )
 from shared_utils.config_loader import load_customer_config, save_customer_config
@@ -201,7 +202,7 @@ elif page == "User Management":
             
             if users:
                 # Statistics
-                col1, col2, col3 = st.columns(3)
+                col1, col2, col3, col4, col5, col6 = st.columns(6)
                 with col1:
                     st.metric("Total Users", len(users))
                 with col2:
@@ -210,6 +211,15 @@ elif page == "User Management":
                 with col3:
                     disabled_count = len([u for u in users if not u.get('enabled', True)])
                     st.metric("Disabled Users", disabled_count)
+                with col4:
+                    basic_count = len([u for u in users if u.get('tier', 'Basic') == 'Basic'])
+                    st.metric("Basic Tier", basic_count)
+                with col5:
+                    standard_count = len([u for u in users if u.get('tier', 'Basic') == 'Standard'])
+                    st.metric("Standard Tier", standard_count)
+                with col6:
+                    premium_count = len([u for u in users if u.get('tier', 'Basic') == 'Premium'])
+                    st.metric("Premium Tier", premium_count)
                 
                 # Display users table
                 df_users = pd.DataFrame(users)
@@ -231,11 +241,12 @@ elif page == "User Management":
             new_username = st.text_input("Username *", help="Unique username for the user")
             new_password = st.text_input("Password *", type="password", help="User's password")
             new_email = st.text_input("Email (Optional)", help="User's email address")
+            new_tier = st.selectbox("Tier *", ["Basic", "Standard", "Premium"], index=0, help="User subscription tier")
             enabled = st.checkbox("Enable User", value=True, help="User can login if enabled")
             
             if st.form_submit_button("Create User", type="primary"):
                 if new_username and new_password:
-                    success, message = create_user(new_username, new_password, enabled, new_email)
+                    success, message = create_user(new_username, new_password, enabled, new_email, new_tier)
                     if success:
                         st.success(f"✅ {message}")
                         st.rerun()
@@ -256,6 +267,7 @@ elif page == "User Management":
                     if user_info:
                         st.write(f"**Username:** {user_info.get('username')}")
                         st.write(f"**Email:** {user_info.get('email', 'N/A')}")
+                        st.write(f"**Tier:** {user_info.get('tier', 'Basic')}")
                         st.write(f"**Status:** {'✅ Enabled' if user_info.get('enabled', True) else '❌ Disabled'}")
                         st.write(f"**Created:** {user_info.get('created_date', 'N/A')}")
                         st.write(f"**Last Login:** {user_info.get('last_login', 'Never')}")
@@ -263,7 +275,7 @@ elif page == "User Management":
                         st.divider()
                         
                         # Actions
-                        col1, col2, col3 = st.columns(3)
+                        col1, col2, col3, col4 = st.columns(4)
                         
                         with col1:
                             if user_info.get('enabled', True):
@@ -284,6 +296,19 @@ elif page == "User Management":
                                         st.error(message)
                         
                         with col2:
+                            st.subheader("Change Tier")
+                            with st.form("change_tier_form"):
+                                new_tier = st.selectbox("Select Tier", ["Basic", "Standard", "Premium"], 
+                                                       index=["Basic", "Standard", "Premium"].index(user_info.get('tier', 'Basic')))
+                                if st.form_submit_button("Update Tier"):
+                                    success, message = update_user_tier(selected_username, new_tier)
+                                    if success:
+                                        st.success(message)
+                                        st.rerun()
+                                    else:
+                                        st.error(message)
+                        
+                        with col3:
                             st.subheader("Reset Password")
                             with st.form("reset_password_form"):
                                 new_password = st.text_input("New Password", type="password", key="reset_pwd")
@@ -297,7 +322,7 @@ elif page == "User Management":
                                     else:
                                         st.error("Please enter a new password")
                         
-                        with col3:
+                        with col4:
                             st.subheader("Delete User")
                             if st.button("🗑️ Delete User", type="secondary"):
                                 if st.session_state.get('confirm_delete') != selected_username:
