@@ -574,39 +574,37 @@ elif page == "User Management":
                         
                         with col2:
                             st.subheader("Change Tier")
-                            tier_key = f"tier_{selected_username}"
-                            if tier_key not in st.session_state:
-                                st.session_state[tier_key] = user_info.get('tier', 'Basic')
+                            current_tier = user_info.get('tier', 'Basic')
+                            tier_options = ["Basic", "Standard", "Premium"]
+                            tier_index = tier_options.index(current_tier) if current_tier in tier_options else 0
                             
-                            new_tier = st.selectbox("Select Tier", ["Basic", "Standard", "Premium"], 
-                                                   index=["Basic", "Standard", "Premium"].index(st.session_state[tier_key]),
+                            new_tier = st.selectbox("Select Tier", tier_options, 
+                                                   index=tier_index,
                                                    key=f"tier_select_{selected_username}")
                             
                             if st.button("Update Tier", key=f"tier_btn_{selected_username}"):
-                                if new_tier != user_info.get('tier', 'Basic'):
+                                if new_tier != current_tier:
                                     success, message = update_user_tier(selected_username, new_tier)
                                     if success:
                                         st.success(message)
-                                        st.session_state[tier_key] = new_tier
                                     else:
                                         st.error(message)
                         
                         with col3:
                             st.subheader("Change Role")
-                            role_key = f"role_{selected_username}"
-                            if role_key not in st.session_state:
-                                st.session_state[role_key] = user_info.get('role', 'User')
+                            current_role = user_info.get('role', 'User')
+                            role_options = ["Admin", "User", "Viewer"]
+                            role_index = role_options.index(current_role) if current_role in role_options else 1
                             
-                            new_role = st.selectbox("Select Role", ["Admin", "User", "Viewer"],
-                                                   index=["Admin", "User", "Viewer"].index(st.session_state[role_key]),
+                            new_role = st.selectbox("Select Role", role_options,
+                                                   index=role_index,
                                                    key=f"role_select_{selected_username}")
                             
                             if st.button("Update Role", key=f"role_btn_{selected_username}"):
-                                if new_role != user_info.get('role', 'User'):
+                                if new_role != current_role:
                                     success, message = update_user_role(selected_username, new_role)
                                     if success:
                                         st.success(message)
-                                        st.session_state[role_key] = new_role
                                     else:
                                         st.error(message)
                         
@@ -620,12 +618,8 @@ elif page == "User Management":
                                 company_options.index(current_company_id) if current_company_id in company_options else 0
                             )
                             
-                            company_key = f"company_{selected_username}"
-                            if company_key not in st.session_state:
-                                st.session_state[company_key] = current_company_idx
-                            
                             new_company_idx = st.selectbox("Select Company", range(len(company_options)),
-                                                          index=st.session_state[company_key],
+                                                          index=current_company_idx,
                                                           format_func=lambda x: company_labels[x],
                                                           key=f"company_select_{selected_username}")
                             new_company_id = company_options[new_company_idx] if new_company_idx > 0 else None
@@ -635,7 +629,6 @@ elif page == "User Management":
                                     success, message = update_user_company(selected_username, new_company_id)
                                     if success:
                                         st.success(message)
-                                        st.session_state[company_key] = new_company_idx
                                     else:
                                         st.error(message)
                         
@@ -644,9 +637,11 @@ elif page == "User Management":
                             # Use a form to handle password reset properly
                             with st.form(f"reset_pwd_form_{selected_username}", clear_on_submit=True):
                                 new_password = st.text_input("New Password", type="password", key=f"reset_pwd_{selected_username}")
-                                if st.form_submit_button("Update Password", use_container_width=True):
-                                    if new_password:
-                                        success, message = update_user_password(selected_username, new_password)
+                                submitted = st.form_submit_button("Update Password", use_container_width=True)
+                                
+                                if submitted:
+                                    if new_password and new_password.strip():
+                                        success, message = update_user_password(selected_username, new_password.strip())
                                         if success:
                                             st.success(message)
                                         else:

@@ -1,9 +1,8 @@
 ﻿# Runtime files
-config/customer_config.json
 data/posts.json
 data/users.json
-data/companies.json
-# Note: data/auth.json is now tracked in git as the source of truth
+data/customer_config.json
+# Note: data/auth.json and data/companies.json are tracked in git as the source of truth
 
 # Secrets (contains sensitive API keys)
 .streamlit/secrets.toml
