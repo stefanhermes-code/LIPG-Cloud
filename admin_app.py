@@ -106,14 +106,25 @@ st.markdown(f"""
 
 # Header with Logo
 if _logo_exists:
-    col_logo, col_text = st.columns([1, 4])
-    with col_logo:
-        st.image(_logo_path, use_container_width=True)
-    with col_text:
+    try:
+        col_logo, col_text = st.columns([1, 4])
+        with col_logo:
+            st.image(_logo_path, use_container_width=True)
+        with col_text:
+            st.markdown(f"""
+                <div class="admin-header-text">
+                    <h1>⚙️ Admin Dashboard - {customer_name}</h1>
+                    <p>Manage users, posts, and view analytics</p>
+                </div>
+            """, unsafe_allow_html=True)
+    except Exception:
+        # Fallback if logo fails to load
         st.markdown(f"""
-            <div class="admin-header-text">
-                <h1>⚙️ Admin Dashboard - {customer_name}</h1>
-                <p>Manage users, posts, and view analytics</p>
+            <div class="admin-header">
+                <div class="admin-header-text">
+                    <h1>⚙️ Admin Dashboard - {customer_name}</h1>
+                    <p>Manage users, posts, and view analytics</p>
+                </div>
             </div>
         """, unsafe_allow_html=True)
 else:

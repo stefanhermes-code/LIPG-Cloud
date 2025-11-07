@@ -130,14 +130,25 @@ st.markdown(f"""
 
 # Header with Logo
 if _logo_exists:
-    col_logo, col_text = st.columns([1, 3])
-    with col_logo:
-        st.image(_logo_path, use_container_width=True)
-    with col_text:
+    try:
+        col_logo, col_text = st.columns([1, 3])
+        with col_logo:
+            st.image(_logo_path, use_container_width=True)
+        with col_text:
+            st.markdown(f"""
+                <div class="header-text">
+                    <h1>{customer_name}</h1>
+                    <h2>LinkedIn Post Generator</h2>
+                </div>
+            """, unsafe_allow_html=True)
+    except Exception:
+        # Fallback if logo fails to load
         st.markdown(f"""
-            <div class="header-text">
-                <h1>{customer_name}</h1>
-                <h2>LinkedIn Post Generator</h2>
+            <div class="header-container">
+                <div class="header-text">
+                    <h1>💼 {customer_name}</h1>
+                    <h2>LinkedIn Post Generator</h2>
+                </div>
             </div>
         """, unsafe_allow_html=True)
 else:
