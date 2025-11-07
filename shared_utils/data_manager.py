@@ -554,11 +554,13 @@ def get_company_users(company_id):
     try:
         auth_data = _load_json_file(AUTH_FILE)
         company_users = [u for u in auth_data if u.get('company_id') == company_id]
-        # Remove passwords
+        # Remove passwords and ensure default fields exist (backward compatibility)
         for user in company_users:
             user.pop('password', None)
             if 'tier' not in user:
                 user['tier'] = 'Basic'
+            if 'role' not in user:
+                user['role'] = 'User'
         return company_users
     except Exception as e:
         logging.error(f"Error getting company users: {str(e)}")

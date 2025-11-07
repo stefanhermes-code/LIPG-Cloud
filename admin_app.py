@@ -312,7 +312,14 @@ elif page == "Company Management":
                         company_users = get_company_users(selected_company_id)
                         if company_users:
                             df_users = pd.DataFrame(company_users)
-                            st.dataframe(df_users[['username', 'email', 'tier', 'role', 'enabled']], use_container_width=True)
+                            # Only select columns that exist in the DataFrame
+                            available_columns = df_users.columns.tolist()
+                            display_columns = ['username', 'email', 'tier', 'role', 'enabled']
+                            columns_to_show = [col for col in display_columns if col in available_columns]
+                            if columns_to_show:
+                                st.dataframe(df_users[columns_to_show], use_container_width=True)
+                            else:
+                                st.dataframe(df_users, use_container_width=True)
                         else:
                             st.info("No users assigned to this company")
                         
