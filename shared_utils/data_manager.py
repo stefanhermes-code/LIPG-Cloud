@@ -214,15 +214,36 @@ def get_analytics_data():
 def authenticate_user(username, password):
     """Authenticate a user with username and password"""
     try:
+        # Normalize username (strip whitespace, case-insensitive comparison)
+        username = username.strip() if username else ""
+        password = password.strip() if password else ""
+        
+        if not username or not password:
+            return False, "Username and password are required"
+        
         auth_data = _load_json_file(AUTH_FILE)
+        
+        # Debug: log file path and data count
+        logging.info(f"Authenticating user. Auth file: {AUTH_FILE}, exists: {AUTH_FILE.exists()}, users count: {len(auth_data)}")
+        
+        if not auth_data:
+            logging.warning(f"Auth file is empty or doesn't exist: {AUTH_FILE}")
+            return False, "No users found in system. Please contact administrator."
+        
         for user in auth_data:
-            if user.get('username') == username:
+            # Case-insensitive username comparison with whitespace stripped
+            stored_username = user.get('username', '').strip() if user.get('username') else ""
+            if stored_username.lower() == username.lower():
                 if not user.get('enabled', True):
                     return False, "User account is disabled"
                 if user.get('password') == password:
                     return True, "Authentication successful"
                 else:
                     return False, "Incorrect password"
+        
+        # Log available usernames for debugging (without passwords)
+        available_users = [u.get('username', 'N/A') for u in auth_data]
+        logging.warning(f"User '{username}' not found. Available users: {available_users}")
         return False, "User not found"
     except Exception as e:
         logging.error(f"Error authenticating user: {str(e)}")
