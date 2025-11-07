@@ -339,12 +339,23 @@ def create_user(username, password, enabled=True, email="", tier="Basic", compan
 def update_user_password(username, new_password):
     """Update user password"""
     try:
+        # Normalize username (strip whitespace, case-insensitive comparison)
+        username = username.strip() if username else ""
+        new_password = new_password.strip() if new_password else ""
+        
+        if not username or not new_password:
+            return False, "Username and password are required"
+        
         auth_data = _load_json_file(AUTH_FILE)
         for user in auth_data:
-            if user.get('username') == username:
+            # Case-insensitive username comparison with whitespace stripped
+            stored_username = user.get('username', '').strip() if user.get('username') else ""
+            if stored_username.lower() == username.lower():
                 user['password'] = new_password  # In production, hash this
                 _save_json_file(AUTH_FILE, auth_data)
+                logging.info(f"Password updated successfully for user: {username}")
                 return True, "Password updated successfully"
+        logging.warning(f"User not found for password update: {username}")
         return False, "User not found"
     except Exception as e:
         logging.error(f"Error updating password: {str(e)}")
