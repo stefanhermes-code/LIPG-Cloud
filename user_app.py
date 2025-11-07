@@ -8,6 +8,7 @@ import os
 import sys
 from datetime import datetime
 import json
+import hashlib
 
 # Ensure we can import from shared_utils when app is at repo root
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -41,6 +42,8 @@ if 'visual_prompt' not in st.session_state:
     st.session_state.visual_prompt = ""
 if 'generating' not in st.session_state:
     st.session_state.generating = False
+if 'last_generation_request' not in st.session_state:
+    st.session_state.last_generation_request = None
 
 # Load customer configuration
 try:
@@ -336,61 +339,70 @@ with col2:
 st.divider()
 col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 1])
 with col_btn2:
-    generate_button = st.button("🚀 Generate Post", type="primary", use_container_width=True)
+    generate_button = st.button("🚀 Generate Post", type="primary", use_container_width=True, disabled=st.session_state.generating)
 
-# Generate post
+# Generate post - use request ID to prevent duplicate processing
 if generate_button and not st.session_state.generating:
-    if not topic or not purpose or not message:
-        st.error("⚠️ Please fill in all required fields (marked with *)")
-    else:
+    # Create a unique request ID based on inputs and timestamp
+    request_data = f"{topic}|{purpose}|{message}|{audience}|{post_goal}|{template_type}|{datetime.now().isoformat()}"
+    request_id = hashlib.md5(request_data.encode()).hexdigest()
+    
+    # Only process if this is a new request (not already processed)
+    if st.session_state.last_generation_request != request_id:
+        st.session_state.last_generation_request = request_id
         st.session_state.generating = True
-        with st.spinner("✨ Generating your LinkedIn post..."):
-            try:
-                post, visual_prompt = generate_ai_post(
-                    topic=topic,
-                    purpose=purpose,
-                    audience=audience,
-                    message=message,
-                    tone_intensity=tone_intensity,
-                    language_style=language_style,
-                    post_length=post_length,
-                    formatting=formatting,
-                    cta=cta,
-                    post_goal=post_goal,
-                    template_type=template_type,
-                    visual_style=visual_style
-                )
-                
-                if post.startswith("⚠️"):
-                    st.error(post)
+        
+        if not topic or not purpose or not message:
+            st.error("⚠️ Please fill in all required fields (marked with *)")
+            st.session_state.generating = False
+        else:
+            with st.spinner("✨ Generating your LinkedIn post..."):
+                try:
+                    post, visual_prompt = generate_ai_post(
+                        topic=topic,
+                        purpose=purpose,
+                        audience=audience,
+                        message=message,
+                        tone_intensity=tone_intensity,
+                        language_style=language_style,
+                        post_length=post_length,
+                        formatting=formatting,
+                        cta=cta,
+                        post_goal=post_goal,
+                        template_type=template_type,
+                        visual_style=visual_style
+                    )
+                    
+                    if post.startswith("⚠️"):
+                        st.error(post)
+                        st.session_state.generating = False
+                    else:
+                        st.session_state.generated_post = post
+                        st.session_state.visual_prompt = visual_prompt
+                        st.session_state.generating = False
+                        
+                        # Save to database
+                        if st.session_state.username:
+                            save_post_to_database(
+                                user_id=st.session_state.username,
+                                topic=topic,
+                                purpose=purpose,
+                                audience=audience,
+                                message=message,
+                                tone_intensity=tone_intensity,
+                                language_style=language_style,
+                                post_length=post_length,
+                                formatting=formatting,
+                                cta=cta,
+                                post_goal=post_goal,
+                                generated_post=post
+                            )
+                        
+                        st.success("✅ Post generated successfully!")
+                        
+                except Exception as e:
+                    st.error(f"❌ Error generating post: {str(e)}")
                     st.session_state.generating = False
-                else:
-                    st.session_state.generated_post = post
-                    st.session_state.visual_prompt = visual_prompt
-                    st.session_state.generating = False
-                    
-                    # Save to database
-                    if st.session_state.username:
-                        save_post_to_database(
-                            user_id=st.session_state.username,
-                            topic=topic,
-                            purpose=purpose,
-                            audience=audience,
-                            message=message,
-                            tone_intensity=tone_intensity,
-                            language_style=language_style,
-                            post_length=post_length,
-                            formatting=formatting,
-                            cta=cta,
-                            post_goal=post_goal,
-                            generated_post=post
-                        )
-                    
-                    st.success("✅ Post generated successfully!")
-                    
-            except Exception as e:
-                st.error(f"❌ Error generating post: {str(e)}")
-                st.session_state.generating = False
 
 # Display generated post
 if st.session_state.generated_post:
