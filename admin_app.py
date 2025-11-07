@@ -25,7 +25,17 @@ from shared_utils.data_manager import (
     enable_disable_user,
     update_user_password,
     update_user_tier,
-    get_user
+    update_user_role,
+    update_user_company,
+    get_user,
+    create_company,
+    get_company,
+    get_all_companies,
+    update_company_subscription,
+    enable_disable_company,
+    delete_company,
+    get_company_users,
+    is_subscription_active
 )
 from shared_utils.config_loader import load_customer_config, save_customer_config
 
@@ -148,7 +158,7 @@ else:
 st.sidebar.title("📊 Navigation")
 page = st.sidebar.radio(
     "Select Page",
-    ["Dashboard", "User Management", "Post Management", "Analytics", "Configuration"]
+    ["Dashboard", "Company Management", "User Management", "Post Management", "Analytics", "Configuration"]
 )
 
 # Dashboard Overview
@@ -187,6 +197,172 @@ if page == "Dashboard":
     
     except Exception as e:
         st.error(f"Error loading dashboard: {str(e)}")
+
+# Company Management
+elif page == "Company Management":
+    st.header("🏢 Company Management")
+    
+    # Tabs for different company management actions
+    tab1, tab2, tab3 = st.tabs(["View Companies", "Add New Company", "Manage Existing Company"])
+    
+    with tab1:
+        st.subheader("All Companies")
+        try:
+            companies = get_all_companies()
+            
+            if companies:
+                # Statistics
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Total Companies", len(companies))
+                with col2:
+                    active_subs = len([c for c in companies if is_subscription_active(c.get('id'))])
+                    st.metric("Active Subscriptions", active_subs)
+                with col3:
+                    monthly_count = len([c for c in companies if c.get('subscription_type') == 'monthly'])
+                    st.metric("Monthly Plans", monthly_count)
+                with col4:
+                    annual_count = len([c for c in companies if c.get('subscription_type') == 'annual'])
+                    st.metric("Annual Plans", annual_count)
+                
+                # Display companies table
+                df_companies = pd.DataFrame(companies)
+                # Format dates
+                if 'start_date' in df_companies.columns:
+                    df_companies['start_date'] = pd.to_datetime(df_companies['start_date']).dt.strftime('%Y-%m-%d')
+                if 'expiration_date' in df_companies.columns:
+                    df_companies['expiration_date'] = pd.to_datetime(df_companies['expiration_date']).dt.strftime('%Y-%m-%d')
+                if 'created_date' in df_companies.columns:
+                    df_companies['created_date'] = pd.to_datetime(df_companies['created_date']).dt.strftime('%Y-%m-%d')
+                
+                # Add subscription status
+                df_companies['subscription_status'] = df_companies['id'].apply(
+                    lambda x: '✅ Active' if is_subscription_active(x) else '❌ Expired'
+                )
+                
+                st.dataframe(df_companies, use_container_width=True)
+            else:
+                st.info("No companies found. Create your first company in the 'Add New Company' tab.")
+        except Exception as e:
+            st.error(f"Error loading companies: {str(e)}")
+    
+    with tab2:
+        st.subheader("➕ Add New Company")
+        with st.form("add_company_form"):
+            company_name = st.text_input("Company Name *", help="Name of the company")
+            subscription_type = st.selectbox("Subscription Type *", ["monthly", "annual"], index=0)
+            start_date = st.date_input("Start Date", value=datetime.now().date())
+            expiration_date = st.date_input("Expiration Date", 
+                                           value=(datetime.now() + timedelta(days=30)).date() if subscription_type == "monthly" 
+                                           else (datetime.now() + timedelta(days=365)).date())
+            
+            if st.form_submit_button("Create Company", type="primary"):
+                if company_name:
+                    success, company_id = create_company(
+                        company_name, 
+                        subscription_type, 
+                        start_date.isoformat(), 
+                        expiration_date.isoformat()
+                    )
+                    if success:
+                        st.success(f"✅ Company created successfully! Company ID: {company_id}")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Error: {company_id}")
+                else:
+                    st.error("⚠️ Company name is required")
+    
+    with tab3:
+        st.subheader("⚙️ Manage Existing Company")
+        try:
+            companies = get_all_companies()
+            if companies:
+                selected_company_id = st.selectbox("Select Company", 
+                                                   [c['id'] for c in companies],
+                                                   format_func=lambda x: f"{x} - {next((c['name'] for c in companies if c['id'] == x), 'Unknown')}")
+                
+                if selected_company_id:
+                    company_info = get_company(selected_company_id)
+                    if company_info:
+                        st.write(f"**Company ID:** {company_info.get('id')}")
+                        st.write(f"**Company Name:** {company_info.get('name')}")
+                        st.write(f"**Subscription Type:** {company_info.get('subscription_type', 'monthly').title()}")
+                        st.write(f"**Start Date:** {company_info.get('start_date', 'N/A')}")
+                        st.write(f"**Expiration Date:** {company_info.get('expiration_date', 'N/A')}")
+                        st.write(f"**Status:** {'✅ Active' if is_subscription_active(selected_company_id) else '❌ Expired'}")
+                        st.write(f"**Enabled:** {'✅ Yes' if company_info.get('enabled', True) else '❌ No'}")
+                        
+                        # Show company users
+                        st.divider()
+                        st.subheader("Company Users")
+                        company_users = get_company_users(selected_company_id)
+                        if company_users:
+                            df_users = pd.DataFrame(company_users)
+                            st.dataframe(df_users[['username', 'email', 'tier', 'role', 'enabled']], use_container_width=True)
+                        else:
+                            st.info("No users assigned to this company")
+                        
+                        st.divider()
+                        
+                        # Actions
+                        col1, col2, col3, col4 = st.columns(4)
+                        
+                        with col1:
+                            if company_info.get('enabled', True):
+                                if st.button("🚫 Disable Company", type="secondary"):
+                                    success, message = enable_disable_company(selected_company_id, False)
+                                    if success:
+                                        st.success(message)
+                                        st.rerun()
+                                    else:
+                                        st.error(message)
+                            else:
+                                if st.button("✅ Enable Company", type="primary"):
+                                    success, message = enable_disable_company(selected_company_id, True)
+                                    if success:
+                                        st.success(message)
+                                        st.rerun()
+                                    else:
+                                        st.error(message)
+                        
+                        with col2:
+                            st.subheader("Update Subscription")
+                            with st.form("update_subscription_form"):
+                                new_sub_type = st.selectbox("Subscription Type", ["monthly", "annual"],
+                                                           index=0 if company_info.get('subscription_type') == 'monthly' else 1)
+                                new_start = st.date_input("Start Date", 
+                                                         value=datetime.fromisoformat(company_info.get('start_date', datetime.now().isoformat()).split('T')[0]).date())
+                                new_expiration = st.date_input("Expiration Date",
+                                                              value=datetime.fromisoformat(company_info.get('expiration_date', datetime.now().isoformat()).split('T')[0]).date())
+                                if st.form_submit_button("Update Subscription"):
+                                    success, message = update_company_subscription(
+                                        selected_company_id, new_sub_type, 
+                                        new_start.isoformat(), new_expiration.isoformat()
+                                    )
+                                    if success:
+                                        st.success(message)
+                                        st.rerun()
+                                    else:
+                                        st.error(message)
+                        
+                        with col3:
+                            st.subheader("Delete Company")
+                            if st.button("🗑️ Delete Company", type="secondary"):
+                                if st.session_state.get('confirm_delete_company') != selected_company_id:
+                                    st.session_state.confirm_delete_company = selected_company_id
+                                    st.warning("⚠️ Click again to confirm deletion")
+                                else:
+                                    success, message = delete_company(selected_company_id)
+                                    if success:
+                                        st.success(message)
+                                        st.session_state.confirm_delete_company = None
+                                        st.rerun()
+                                    else:
+                                        st.error(message)
+            else:
+                st.info("No companies found. Create your first company in the 'Add New Company' tab.")
+        except Exception as e:
+            st.error(f"Error managing companies: {str(e)}")
 
 # User Management
 elif page == "User Management":
@@ -241,12 +417,22 @@ elif page == "User Management":
             new_username = st.text_input("Username *", help="Unique username for the user")
             new_password = st.text_input("Password *", type="password", help="User's password")
             new_email = st.text_input("Email (Optional)", help="User's email address")
+            
+            # Company selection
+            companies = get_all_companies()
+            company_options = [None] + [c['id'] for c in companies]
+            company_labels = ["No Company"] + [f"{c['id']} - {c['name']}" for c in companies]
+            selected_company_idx = st.selectbox("Company (Optional)", range(len(company_options)), 
+                                                format_func=lambda x: company_labels[x])
+            selected_company_id = company_options[selected_company_idx] if selected_company_idx > 0 else None
+            
             new_tier = st.selectbox("Tier *", ["Basic", "Standard", "Premium"], index=0, help="User subscription tier")
+            new_role = st.selectbox("Role *", ["Admin", "User", "Viewer"], index=1, help="User role within company")
             enabled = st.checkbox("Enable User", value=True, help="User can login if enabled")
             
             if st.form_submit_button("Create User", type="primary"):
                 if new_username and new_password:
-                    success, message = create_user(new_username, new_password, enabled, new_email, new_tier)
+                    success, message = create_user(new_username, new_password, enabled, new_email, new_tier, selected_company_id, new_role)
                     if success:
                         st.success(f"✅ {message}")
                         st.rerun()
@@ -268,6 +454,14 @@ elif page == "User Management":
                         st.write(f"**Username:** {user_info.get('username')}")
                         st.write(f"**Email:** {user_info.get('email', 'N/A')}")
                         st.write(f"**Tier:** {user_info.get('tier', 'Basic')}")
+                        company_id = user_info.get('company_id')
+                        if company_id:
+                            company = get_company(company_id)
+                            company_name = company.get('name', 'Unknown') if company else 'Unknown'
+                            st.write(f"**Company:** {company_id} - {company_name}")
+                        else:
+                            st.write(f"**Company:** No company assigned")
+                        st.write(f"**Role:** {user_info.get('role', 'User')}")
                         st.write(f"**Status:** {'✅ Enabled' if user_info.get('enabled', True) else '❌ Disabled'}")
                         st.write(f"**Created:** {user_info.get('created_date', 'N/A')}")
                         st.write(f"**Last Login:** {user_info.get('last_login', 'Never')}")
@@ -275,7 +469,7 @@ elif page == "User Management":
                         st.divider()
                         
                         # Actions
-                        col1, col2, col3, col4 = st.columns(4)
+                        col1, col2, col3, col4, col5 = st.columns(5)
                         
                         with col1:
                             if user_info.get('enabled', True):
@@ -309,6 +503,40 @@ elif page == "User Management":
                                         st.error(message)
                         
                         with col3:
+                            st.subheader("Change Role")
+                            with st.form("change_role_form"):
+                                new_role = st.selectbox("Select Role", ["Admin", "User", "Viewer"],
+                                                       index=["Admin", "User", "Viewer"].index(user_info.get('role', 'User')))
+                                if st.form_submit_button("Update Role"):
+                                    success, message = update_user_role(selected_username, new_role)
+                                    if success:
+                                        st.success(message)
+                                        st.rerun()
+                                    else:
+                                        st.error(message)
+                        
+                        with col4:
+                            st.subheader("Change Company")
+                            with st.form("change_company_form"):
+                                companies = get_all_companies()
+                                company_options = [None] + [c['id'] for c in companies]
+                                company_labels = ["No Company"] + [f"{c['id']} - {c['name']}" for c in companies]
+                                current_company_idx = 0 if not user_info.get('company_id') else (
+                                    company_options.index(user_info.get('company_id')) if user_info.get('company_id') in company_options else 0
+                                )
+                                new_company_idx = st.selectbox("Select Company", range(len(company_options)),
+                                                              index=current_company_idx,
+                                                              format_func=lambda x: company_labels[x])
+                                new_company_id = company_options[new_company_idx] if new_company_idx > 0 else None
+                                if st.form_submit_button("Update Company"):
+                                    success, message = update_user_company(selected_username, new_company_id)
+                                    if success:
+                                        st.success(message)
+                                        st.rerun()
+                                    else:
+                                        st.error(message)
+                        
+                        with col5:
                             st.subheader("Reset Password")
                             with st.form("reset_password_form"):
                                 new_password = st.text_input("New Password", type="password", key="reset_pwd")
@@ -322,7 +550,9 @@ elif page == "User Management":
                                     else:
                                         st.error("Please enter a new password")
                         
-                        with col4:
+                        st.divider()
+                        col_delete = st.columns(1)[0]
+                        with col_delete:
                             st.subheader("Delete User")
                             if st.button("🗑️ Delete User", type="secondary"):
                                 if st.session_state.get('confirm_delete') != selected_username:

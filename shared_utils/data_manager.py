@@ -19,6 +19,7 @@ DATA_DIR = _base_dir / "data"
 POSTS_FILE = DATA_DIR / "posts.json"
 USERS_FILE = DATA_DIR / "users.json"
 AUTH_FILE = DATA_DIR / "auth.json"  # User authentication data
+COMPANIES_FILE = DATA_DIR / "companies.json"  # Company data with subscriptions
 
 # Ensure data directory exists
 DATA_DIR.mkdir(exist_ok=True)
@@ -236,16 +237,20 @@ def get_user(username):
                 # Don't return password
                 user_info = user.copy()
                 user_info.pop('password', None)
-                # Set default tier if not present (for backward compatibility)
+                # Set defaults if not present (for backward compatibility)
                 if 'tier' not in user_info:
                     user_info['tier'] = 'Basic'
+                if 'company_id' not in user_info:
+                    user_info['company_id'] = None
+                if 'role' not in user_info:
+                    user_info['role'] = 'User'
                 return user_info
         return None
     except Exception as e:
         logging.error(f"Error getting user: {str(e)}")
         return None
 
-def create_user(username, password, enabled=True, email="", tier="Basic"):
+def create_user(username, password, enabled=True, email="", tier="Basic", company_id=None, role="User"):
     """Create a new user account"""
     try:
         auth_data = _load_json_file(AUTH_FILE)
@@ -260,6 +265,18 @@ def create_user(username, password, enabled=True, email="", tier="Basic"):
         if tier not in valid_tiers:
             tier = "Basic"
         
+        # Validate role
+        valid_roles = ["Admin", "User", "Viewer"]
+        if role not in valid_roles:
+            role = "User"
+        
+        # If company_id provided, verify company exists
+        if company_id:
+            companies = _load_json_file(COMPANIES_FILE)
+            company_exists = any(c.get('id') == company_id for c in companies)
+            if not company_exists:
+                return False, f"Company with ID {company_id} not found"
+        
         # Create new user
         new_user = {
             "username": username,
@@ -267,6 +284,8 @@ def create_user(username, password, enabled=True, email="", tier="Basic"):
             "enabled": enabled,
             "email": email,
             "tier": tier,
+            "company_id": company_id,
+            "role": role,
             "created_date": datetime.now().isoformat(),
             "last_login": None
         }
@@ -321,14 +340,18 @@ def get_all_auth_users():
     """Get all authenticated users (without passwords)"""
     try:
         auth_data = _load_json_file(AUTH_FILE)
-        # Remove passwords from response and ensure tier exists (backward compatibility)
+        # Remove passwords from response and ensure defaults exist (backward compatibility)
         users = []
         for user in auth_data:
             user_info = user.copy()
             user_info.pop('password', None)
-            # Set default tier if not present (for backward compatibility)
+            # Set defaults if not present (for backward compatibility)
             if 'tier' not in user_info:
                 user_info['tier'] = 'Basic'
+            if 'company_id' not in user_info:
+                user_info['company_id'] = None
+            if 'role' not in user_info:
+                user_info['role'] = 'User'
             users.append(user_info)
         return users
     except Exception as e:
@@ -366,3 +389,194 @@ def update_user_tier(username, tier):
     except Exception as e:
         logging.error(f"Error updating user tier: {str(e)}")
         return False, f"Error updating user tier: {str(e)}"
+
+def update_user_role(username, role):
+    """Update user role"""
+    try:
+        valid_roles = ["Admin", "User", "Viewer"]
+        if role not in valid_roles:
+            return False, f"Invalid role. Must be one of: {', '.join(valid_roles)}"
+        
+        auth_data = _load_json_file(AUTH_FILE)
+        for user in auth_data:
+            if user.get('username') == username:
+                user['role'] = role
+                _save_json_file(AUTH_FILE, auth_data)
+                return True, f"User role updated to {role} successfully"
+        return False, "User not found"
+    except Exception as e:
+        logging.error(f"Error updating user role: {str(e)}")
+        return False, f"Error updating user role: {str(e)}"
+
+def update_user_company(username, company_id):
+    """Update user's company"""
+    try:
+        auth_data = _load_json_file(AUTH_FILE)
+        companies = _load_json_file(COMPANIES_FILE)
+        
+        # If company_id provided, verify company exists
+        if company_id:
+            company_exists = any(c.get('id') == company_id for c in companies)
+            if not company_exists:
+                return False, f"Company with ID {company_id} not found"
+        
+        for user in auth_data:
+            if user.get('username') == username:
+                user['company_id'] = company_id
+                _save_json_file(AUTH_FILE, auth_data)
+                return True, f"User company updated successfully"
+        return False, "User not found"
+    except Exception as e:
+        logging.error(f"Error updating user company: {str(e)}")
+        return False, f"Error updating user company: {str(e)}"
+
+# Company Management Functions
+def create_company(name, subscription_type="monthly", start_date=None, expiration_date=None):
+    """Create a new company with subscription"""
+    try:
+        companies = _load_json_file(COMPANIES_FILE)
+        
+        # Check if company already exists
+        for company in companies:
+            if company.get('name', '').lower() == name.lower():
+                return False, "Company name already exists"
+        
+        # Generate company ID
+        company_id = len(companies) + 1
+        
+        # Set default dates if not provided
+        if not start_date:
+            start_date = datetime.now().isoformat()
+        if not expiration_date:
+            if subscription_type == "monthly":
+                expiration_date = (datetime.now() + timedelta(days=30)).isoformat()
+            else:  # annual
+                expiration_date = (datetime.now() + timedelta(days=365)).isoformat()
+        
+        # Validate subscription type
+        if subscription_type not in ["monthly", "annual"]:
+            subscription_type = "monthly"
+        
+        new_company = {
+            "id": company_id,
+            "name": name,
+            "subscription_type": subscription_type,
+            "start_date": start_date,
+            "expiration_date": expiration_date,
+            "created_date": datetime.now().isoformat(),
+            "enabled": True
+        }
+        
+        companies.append(new_company)
+        _save_json_file(COMPANIES_FILE, companies)
+        return True, company_id
+    except Exception as e:
+        logging.error(f"Error creating company: {str(e)}")
+        return False, None
+
+def get_company(company_id):
+    """Get company information by ID"""
+    try:
+        companies = _load_json_file(COMPANIES_FILE)
+        for company in companies:
+            if company.get('id') == company_id:
+                return company
+        return None
+    except Exception as e:
+        logging.error(f"Error getting company: {str(e)}")
+        return None
+
+def get_all_companies():
+    """Get all companies"""
+    try:
+        companies = _load_json_file(COMPANIES_FILE)
+        return companies
+    except Exception as e:
+        logging.error(f"Error getting companies: {str(e)}")
+        return []
+
+def update_company_subscription(company_id, subscription_type=None, start_date=None, expiration_date=None):
+    """Update company subscription dates and type"""
+    try:
+        companies = _load_json_file(COMPANIES_FILE)
+        for company in companies:
+            if company.get('id') == company_id:
+                if subscription_type:
+                    if subscription_type not in ["monthly", "annual"]:
+                        return False, "Invalid subscription type. Must be 'monthly' or 'annual'"
+                    company['subscription_type'] = subscription_type
+                if start_date:
+                    company['start_date'] = start_date
+                if expiration_date:
+                    company['expiration_date'] = expiration_date
+                _save_json_file(COMPANIES_FILE, companies)
+                return True, "Company subscription updated successfully"
+        return False, "Company not found"
+    except Exception as e:
+        logging.error(f"Error updating company subscription: {str(e)}")
+        return False, f"Error updating company subscription: {str(e)}"
+
+def enable_disable_company(company_id, enabled):
+    """Enable or disable a company"""
+    try:
+        companies = _load_json_file(COMPANIES_FILE)
+        for company in companies:
+            if company.get('id') == company_id:
+                company['enabled'] = enabled
+                _save_json_file(COMPANIES_FILE, companies)
+                return True, f"Company {'enabled' if enabled else 'disabled'} successfully"
+        return False, "Company not found"
+    except Exception as e:
+        logging.error(f"Error updating company status: {str(e)}")
+        return False, f"Error updating company status: {str(e)}"
+
+def delete_company(company_id):
+    """Delete a company"""
+    try:
+        companies = _load_json_file(COMPANIES_FILE)
+        companies = [c for c in companies if c.get('id') != company_id]
+        _save_json_file(COMPANIES_FILE, companies)
+        
+        # Also remove company_id from users
+        auth_data = _load_json_file(AUTH_FILE)
+        for user in auth_data:
+            if user.get('company_id') == company_id:
+                user['company_id'] = None
+        _save_json_file(AUTH_FILE, auth_data)
+        
+        return True, "Company deleted successfully"
+    except Exception as e:
+        logging.error(f"Error deleting company: {str(e)}")
+        return False, f"Error deleting company: {str(e)}"
+
+def get_company_users(company_id):
+    """Get all users belonging to a company"""
+    try:
+        auth_data = _load_json_file(AUTH_FILE)
+        company_users = [u for u in auth_data if u.get('company_id') == company_id]
+        # Remove passwords
+        for user in company_users:
+            user.pop('password', None)
+            if 'tier' not in user:
+                user['tier'] = 'Basic'
+        return company_users
+    except Exception as e:
+        logging.error(f"Error getting company users: {str(e)}")
+        return []
+
+def is_subscription_active(company_id):
+    """Check if company subscription is active"""
+    try:
+        company = get_company(company_id)
+        if not company or not company.get('enabled', True):
+            return False
+        
+        expiration_date_str = company.get('expiration_date')
+        if not expiration_date_str:
+            return False
+        
+        expiration_date = datetime.fromisoformat(expiration_date_str.replace('Z', '+00:00'))
+        return datetime.now() < expiration_date
+    except Exception as e:
+        logging.error(f"Error checking subscription status: {str(e)}")
+        return False
