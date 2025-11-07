@@ -429,15 +429,35 @@ if st.session_state.generated_post:
         col_copy1, col_copy2, col_copy3, col_copy4 = st.columns([1, 1, 1, 1])
         
         with col_copy2:
-            # Copy to clipboard button - using Streamlit's clipboard component
-            # Create a copyable text area
-            st.text_area(
-                "Click to select all, then copy (Ctrl+C / Cmd+C)",
-                value=post_text,
-                height=100,
-                key="post_copy_area",
-                label_visibility="visible"
-            )
+            # Copy to clipboard button with JavaScript
+            copy_button_clicked = st.button("📋 Copy to Clipboard", use_container_width=True, key="copy_btn")
+            
+            if copy_button_clicked:
+                # Use JavaScript to copy to clipboard
+                escaped_text = json.dumps(post_text)  # Escape for JavaScript
+                st.markdown(f"""
+                    <script>
+                        function copyToClipboard() {{
+                            const text = {escaped_text};
+                            navigator.clipboard.writeText(text).then(function() {{
+                                console.log('Copied to clipboard');
+                            }}, function(err) {{
+                                console.error('Failed to copy: ', err);
+                                // Fallback for older browsers
+                                const textarea = document.createElement('textarea');
+                                textarea.value = text;
+                                textarea.style.position = 'fixed';
+                                textarea.style.opacity = '0';
+                                document.body.appendChild(textarea);
+                                textarea.select();
+                                document.execCommand('copy');
+                                document.body.removeChild(textarea);
+                            }});
+                        }}
+                        copyToClipboard();
+                    </script>
+                """, unsafe_allow_html=True)
+                st.success("✅ Post copied to clipboard!")
         
         with col_copy3:
             # Download HTML button
