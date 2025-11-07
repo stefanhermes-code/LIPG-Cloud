@@ -13,9 +13,9 @@ logging.basicConfig(level=logging.INFO)
 
 # Configuration file path - relative to LIPG Cloud folder
 _base_dir = Path(__file__).parent.parent  # Go up from shared_utils to LIPG Cloud
-CONFIG_FILE = _base_dir / "config" / "customer_config.json"
+CONFIG_FILE = _base_dir / "data" / "customer_config.json"
 
-# Ensure config directory exists
+# Ensure data directory exists
 CONFIG_FILE.parent.mkdir(exist_ok=True)
 
 # Default configuration

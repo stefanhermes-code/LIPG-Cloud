@@ -54,8 +54,11 @@ def _load_json_file(filepath):
 def _save_json_file(filepath, data):
     """Save JSON data to file"""
     try:
+        # Ensure directory exists
+        filepath.parent.mkdir(parents=True, exist_ok=True)
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
+        logging.info(f"Successfully saved {filepath}")
         return True
     except Exception as e:
         logging.error(f"Error saving {filepath}: {str(e)}")
@@ -263,11 +266,18 @@ def authenticate_user(username, password):
         return False, f"Authentication error: {str(e)}"
 
 def get_user(username):
-    """Get user information by username"""
+    """Get user information by username (case-insensitive)"""
     try:
+        # Normalize username (strip whitespace, case-insensitive comparison)
+        username = username.strip() if username else ""
+        if not username:
+            return None
+        
         auth_data = _load_json_file(AUTH_FILE)
         for user in auth_data:
-            if user.get('username') == username:
+            # Case-insensitive username comparison with whitespace stripped
+            stored_username = user.get('username', '').strip() if user.get('username') else ""
+            if stored_username.lower() == username.lower():
                 # Don't return password
                 user_info = user.copy()
                 user_info.pop('password', None)
@@ -344,21 +354,36 @@ def update_user_password(username, new_password):
         new_password = new_password.strip() if new_password else ""
         
         if not username or not new_password:
+            logging.warning(f"Password update failed: missing username or password")
             return False, "Username and password are required"
         
+        logging.info(f"Attempting to update password for user: {username}")
         auth_data = _load_json_file(AUTH_FILE)
+        logging.info(f"Loaded {len(auth_data)} users from auth file")
+        
+        user_found = False
         for user in auth_data:
             # Case-insensitive username comparison with whitespace stripped
             stored_username = user.get('username', '').strip() if user.get('username') else ""
             if stored_username.lower() == username.lower():
+                user_found = True
+                old_password = user.get('password', '')
                 user['password'] = new_password  # In production, hash this
-                _save_json_file(AUTH_FILE, auth_data)
-                logging.info(f"Password updated successfully for user: {username}")
-                return True, "Password updated successfully"
-        logging.warning(f"User not found for password update: {username}")
-        return False, "User not found"
+                logging.info(f"Password updated in memory for user: {username} (was: {old_password[:3]}..., now: {new_password[:3]}...)")
+                
+                # Save to file
+                if _save_json_file(AUTH_FILE, auth_data):
+                    logging.info(f"Password updated successfully for user: {username}")
+                    return True, "Password updated successfully"
+                else:
+                    logging.error(f"Failed to save password update to file for user: {username}")
+                    return False, "Failed to save password update"
+        
+        if not user_found:
+            logging.warning(f"User not found for password update: {username}. Available users: {[u.get('username') for u in auth_data]}")
+            return False, "User not found"
     except Exception as e:
-        logging.error(f"Error updating password: {str(e)}")
+        logging.error(f"Error updating password: {str(e)}", exc_info=True)
         return False, f"Error updating password: {str(e)}"
 
 def enable_disable_user(username, enabled):
@@ -434,16 +459,27 @@ def update_last_login(username):
 def update_user_tier(username, tier):
     """Update user tier"""
     try:
+        # Normalize username (strip whitespace, case-insensitive comparison)
+        username = username.strip() if username else ""
+        if not username:
+            return False, "Username is required"
+        
         valid_tiers = ["Basic", "Standard", "Premium"]
         if tier not in valid_tiers:
             return False, f"Invalid tier. Must be one of: {', '.join(valid_tiers)}"
         
         auth_data = _load_json_file(AUTH_FILE)
         for user in auth_data:
-            if user.get('username') == username:
+            # Case-insensitive username comparison
+            stored_username = user.get('username', '').strip() if user.get('username') else ""
+            if stored_username.lower() == username.lower():
                 user['tier'] = tier
-                _save_json_file(AUTH_FILE, auth_data)
-                return True, f"User tier updated to {tier} successfully"
+                if _save_json_file(AUTH_FILE, auth_data):
+                    logging.info(f"User tier updated to {tier} for user: {username}")
+                    return True, f"User tier updated to {tier} successfully"
+                else:
+                    return False, "Failed to save tier update"
+        logging.warning(f"User not found for tier update: {username}")
         return False, "User not found"
     except Exception as e:
         logging.error(f"Error updating user tier: {str(e)}")
@@ -452,16 +488,27 @@ def update_user_tier(username, tier):
 def update_user_role(username, role):
     """Update user role"""
     try:
+        # Normalize username (strip whitespace, case-insensitive comparison)
+        username = username.strip() if username else ""
+        if not username:
+            return False, "Username is required"
+        
         valid_roles = ["Admin", "User", "Viewer"]
         if role not in valid_roles:
             return False, f"Invalid role. Must be one of: {', '.join(valid_roles)}"
         
         auth_data = _load_json_file(AUTH_FILE)
         for user in auth_data:
-            if user.get('username') == username:
+            # Case-insensitive username comparison
+            stored_username = user.get('username', '').strip() if user.get('username') else ""
+            if stored_username.lower() == username.lower():
                 user['role'] = role
-                _save_json_file(AUTH_FILE, auth_data)
-                return True, f"User role updated to {role} successfully"
+                if _save_json_file(AUTH_FILE, auth_data):
+                    logging.info(f"User role updated to {role} for user: {username}")
+                    return True, f"User role updated to {role} successfully"
+                else:
+                    return False, "Failed to save role update"
+        logging.warning(f"User not found for role update: {username}")
         return False, "User not found"
     except Exception as e:
         logging.error(f"Error updating user role: {str(e)}")
@@ -470,6 +517,11 @@ def update_user_role(username, role):
 def update_user_company(username, company_id):
     """Update user's company"""
     try:
+        # Normalize username (strip whitespace, case-insensitive comparison)
+        username = username.strip() if username else ""
+        if not username:
+            return False, "Username is required"
+        
         auth_data = _load_json_file(AUTH_FILE)
         companies = _load_json_file(COMPANIES_FILE)
         
@@ -480,10 +532,16 @@ def update_user_company(username, company_id):
                 return False, f"Company with ID {company_id} not found"
         
         for user in auth_data:
-            if user.get('username') == username:
+            # Case-insensitive username comparison
+            stored_username = user.get('username', '').strip() if user.get('username') else ""
+            if stored_username.lower() == username.lower():
                 user['company_id'] = company_id
-                _save_json_file(AUTH_FILE, auth_data)
-                return True, f"User company updated successfully"
+                if _save_json_file(AUTH_FILE, auth_data):
+                    logging.info(f"User company updated to {company_id} for user: {username}")
+                    return True, f"User company updated successfully"
+                else:
+                    return False, "Failed to save company update"
+        logging.warning(f"User not found for company update: {username}")
         return False, "User not found"
     except Exception as e:
         logging.error(f"Error updating user company: {str(e)}")
