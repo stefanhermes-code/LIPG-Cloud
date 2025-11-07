@@ -257,8 +257,12 @@ elif page == "Company Management":
                 st.success(f"✅ Company created successfully! Company ID: {company_id}")
                 st.session_state.company_created = False
                 st.session_state.company_created_id = ""
+                # Clear form fields by resetting form state
+                if 'company_form_cleared' not in st.session_state:
+                    st.session_state.company_form_cleared = True
         
-        with st.form("add_company_form"):
+        # Use form with clear_on_submit to clear fields after successful submission
+        with st.form("add_company_form", clear_on_submit=True):
             company_name = st.text_input("Company Name *", help="Name of the company", value="")
             subscription_type = st.selectbox("Subscription Type *", ["monthly", "annual"], index=0)
             
@@ -282,11 +286,17 @@ elif page == "Company Management":
                     if success:
                         st.session_state.company_created = True
                         st.session_state.company_created_id = company_id
-                        st.rerun()  # Rerun to show success and clear form
+                        # Don't rerun here - let clear_on_submit handle clearing the form
+                        # The success message will show on next rerun (when user interacts)
                     else:
                         st.error(f"❌ Error: {company_id}")
                 else:
                     st.error("⚠️ Company name is required")
+        
+        # Trigger rerun after successful creation to show success message
+        if st.session_state.get('company_created', False) and st.session_state.get('company_form_cleared', False):
+            st.session_state.company_form_cleared = False
+            st.rerun()
     
     with tab3:
         st.subheader("⚙️ Manage Existing Company")
@@ -484,8 +494,12 @@ elif page == "User Management":
                 st.success(f"✅ {message}")
                 st.session_state.user_created = False
                 st.session_state.user_created_message = ""
+                # Clear form fields by resetting form state
+                if 'user_form_cleared' not in st.session_state:
+                    st.session_state.user_form_cleared = True
         
-        with st.form("add_user_form"):
+        # Use form with clear_on_submit to clear fields after successful submission
+        with st.form("add_user_form", clear_on_submit=True):
             new_username = st.text_input("Username *", help="Unique username for the user", value="")
             new_password = st.text_input("Password *", type="password", help="User's password", value="")
             new_email = st.text_input("Email (Optional)", help="User's email address", value="")
@@ -511,11 +525,17 @@ elif page == "User Management":
                     if success:
                         st.session_state.user_created = True
                         st.session_state.user_created_message = message
-                        st.rerun()  # Rerun to show success and clear form
+                        # Don't rerun here - let clear_on_submit handle clearing the form
+                        # The success message will show on next rerun (when user interacts)
                     else:
                         st.error(f"❌ {message}")
                 else:
                     st.error("⚠️ Username and password are required")
+        
+        # Trigger rerun after successful creation to show success message
+        if st.session_state.get('user_created', False) and st.session_state.get('user_form_cleared', False):
+            st.session_state.user_form_cleared = False
+            st.rerun()
     
     with tab3:
         st.subheader("⚙️ Manage Existing User")
