@@ -9,6 +9,8 @@ import sys
 from datetime import datetime
 import json
 import hashlib
+import base64
+import html
 
 # Ensure we can import from shared_utils when app is at repo root
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -411,23 +413,102 @@ if st.session_state.generated_post:
     
     post_container = st.container()
     with post_container:
+        # Display post with proper line breaks preserved
+        post_text = st.session_state.generated_post
+        
+        # Display the post with proper formatting (preserves line breaks)
         st.markdown(f"""
-            <div class="post-container">
-                <h3>Your LinkedIn Post:</h3>
-                <p style="white-space: pre-wrap; font-size: 16px;">{st.session_state.generated_post}</p>
+            <div class="post-container" style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin: 20px 0;">
+                <h3 style="color: #0077b5; margin-bottom: 15px;">Your LinkedIn Post:</h3>
+                <div style="white-space: pre-wrap; font-size: 16px; line-height: 1.8; color: #333; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">{html.escape(post_text)}</div>
             </div>
         """, unsafe_allow_html=True)
         
-        # Copy button
-        st.code(st.session_state.generated_post, language=None)
+        # Action buttons
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_copy1, col_copy2, col_copy3, col_copy4 = st.columns([1, 1, 1, 1])
         
-        col_copy1, col_copy2, col_copy3 = st.columns([1, 1, 1])
         with col_copy2:
-            if st.button("📋 Copy to Clipboard", use_container_width=True):
-                st.write("Post copied! (Use Ctrl+C to copy from the code block above)")
+            # Copy to clipboard button - using Streamlit's clipboard component
+            # Create a copyable text area
+            st.text_area(
+                "Click to select all, then copy (Ctrl+C / Cmd+C)",
+                value=post_text,
+                height=100,
+                key="post_copy_area",
+                label_visibility="visible"
+            )
+        
+        with col_copy3:
+            # Download HTML button
+            # Escape HTML entities in post text
+            escaped_post_text = html.escape(post_text)
+            
+            # Create nicely formatted HTML
+            html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkedIn Post - {datetime.now().strftime('%Y-%m-%d')}</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            line-height: 1.6;
+        }}
+        .post-container {{
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid #0077b5;
+        }}
+        .post-title {{
+            color: #0077b5;
+            font-size: 24px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }}
+        .post-content {{
+            white-space: pre-wrap;
+            font-size: 16px;
+            color: #333;
+            line-height: 1.8;
+        }}
+        .footer {{
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="post-container">
+        <div class="post-title">LinkedIn Post</div>
+        <div class="post-content">{escaped_post_text}</div>
+    </div>
+    <div class="footer">
+        Generated on {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
+    </div>
+</body>
+</html>"""
+            
+            # Create download button
+            b64_html = base64.b64encode(html_content.encode('utf-8')).decode()
+            filename = f"linkedin_post_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+            href = f'<a href="data:text/html;charset=utf-8;base64,{b64_html}" download="{filename}" style="text-decoration: none; color: white; background-color: #0077b5; padding: 10px 20px; border-radius: 5px; display: inline-block; font-weight: 500;">📥 Download HTML</a>'
+            st.markdown(href, unsafe_allow_html=True)
         
         # Visual prompt section
         if st.session_state.visual_prompt:
+            st.divider()
             with st.expander("🎨 Visual Prompt for Image Generation"):
                 st.text(st.session_state.visual_prompt)
                 st.info("💡 Use this prompt with an image generation tool like DALL-E or Midjourney")
