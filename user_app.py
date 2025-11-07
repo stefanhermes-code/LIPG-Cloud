@@ -20,7 +20,9 @@ from shared_utils.data_manager import (
     save_post_to_database, 
     get_user_post_history,
     authenticate_user,
-    update_last_login
+    update_last_login,
+    get_user,
+    get_company
 )
 from shared_utils.config_loader import load_customer_config
 from shared_utils.templates_config import get_template, get_all_templates
@@ -146,6 +148,19 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
+# Get company name for logged-in user
+display_company_name = customer_name  # Default to global customer name
+if st.session_state.get('authenticated') and st.session_state.get('username'):
+    try:
+        user_info = get_user(st.session_state.username)
+        if user_info and user_info.get('company_id'):
+            company_info = get_company(user_info.get('company_id'))
+            if company_info:
+                display_company_name = company_info.get('name', customer_name)
+    except Exception:
+        # If error getting company, use default
+        pass
+
 # Header with Logo
 if _logo_exists:
     try:
@@ -155,7 +170,7 @@ if _logo_exists:
         with col_text:
             st.markdown(f"""
                 <div class="header-text">
-                    <h1>{customer_name}</h1>
+                    <h1>{display_company_name}</h1>
                     <h2>LinkedIn Post Generator</h2>
                 </div>
             """, unsafe_allow_html=True)
@@ -164,7 +179,7 @@ if _logo_exists:
         st.markdown(f"""
             <div class="header-container">
                 <div class="header-text">
-                    <h1>{customer_name}</h1>
+                    <h1>{display_company_name}</h1>
                     <h2>LinkedIn Post Generator</h2>
                 </div>
             </div>
@@ -173,7 +188,7 @@ else:
     st.markdown(f"""
         <div class="header-container">
             <div class="header-text">
-                <h1>{customer_name}</h1>
+                <h1>{display_company_name}</h1>
                 <h2>LinkedIn Post Generator</h2>
             </div>
         </div>
