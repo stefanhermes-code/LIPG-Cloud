@@ -39,6 +39,8 @@ if 'generated_post' not in st.session_state:
     st.session_state.generated_post = ""
 if 'visual_prompt' not in st.session_state:
     st.session_state.visual_prompt = ""
+if 'generating' not in st.session_state:
+    st.session_state.generating = False
 
 # Load customer configuration
 try:
@@ -243,7 +245,7 @@ with st.sidebar:
     if st.button("🔄 Reset Form"):
         st.session_state.generated_post = ""
         st.session_state.visual_prompt = ""
-        st.rerun()
+        st.session_state.generating = False
 
 # Main form
 col1, col2 = st.columns([1, 1])
@@ -337,10 +339,11 @@ with col_btn2:
     generate_button = st.button("🚀 Generate Post", type="primary", use_container_width=True)
 
 # Generate post
-if generate_button:
+if generate_button and not st.session_state.generating:
     if not topic or not purpose or not message:
         st.error("⚠️ Please fill in all required fields (marked with *)")
     else:
+        st.session_state.generating = True
         with st.spinner("✨ Generating your LinkedIn post..."):
             try:
                 post, visual_prompt = generate_ai_post(
@@ -360,9 +363,11 @@ if generate_button:
                 
                 if post.startswith("⚠️"):
                     st.error(post)
+                    st.session_state.generating = False
                 else:
                     st.session_state.generated_post = post
                     st.session_state.visual_prompt = visual_prompt
+                    st.session_state.generating = False
                     
                     # Save to database
                     if st.session_state.username:
@@ -382,10 +387,10 @@ if generate_button:
                         )
                     
                     st.success("✅ Post generated successfully!")
-                    st.rerun()
                     
             except Exception as e:
                 st.error(f"❌ Error generating post: {str(e)}")
+                st.session_state.generating = False
 
 # Display generated post
 if st.session_state.generated_post:
@@ -437,7 +442,6 @@ if st.session_state.get('show_history', False):
     
     if st.button("Close History"):
         st.session_state.show_history = False
-        st.rerun()
 
 # Footer
 st.divider()
