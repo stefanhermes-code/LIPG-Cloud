@@ -46,6 +46,10 @@ if 'generating' not in st.session_state:
     st.session_state.generating = False
 if 'last_generation_request' not in st.session_state:
     st.session_state.last_generation_request = None
+if 'form_reset' not in st.session_state:
+    st.session_state.form_reset = False
+if 'reset_key' not in st.session_state:
+    st.session_state.reset_key = '0'
 
 # Load customer configuration
 try:
@@ -177,25 +181,6 @@ else:
 
 # Instructions section
 with st.expander("📖 How to Use - Step-by-Step Instructions", expanded=False):
-    st.markdown(f"""
-        <div class="instructions-box">
-            <h3>Getting Started</h3>
-            <ol>
-                <li><strong>Enter the topic</strong> of your LinkedIn post (what you want to write about)</li>
-                <li><strong>Specify the purpose</strong> - what do you want to achieve with this post?</li>
-                <li><strong>Select your target audience</strong> from the dropdown menu</li>
-                <li><strong>Enter the key message</strong> - the main point you want to convey</li>
-                <li><strong>Choose the tone intensity</strong> - how strong should the tone be?</li>
-                <li><strong>Select the language style</strong> - professional, casual, technical, etc.</li>
-                <li><strong>Pick the post length</strong> - from very short to very long</li>
-                <li><strong>Choose the formatting style</strong> - bullet points, paragraphs, numbered lists, etc.</li>
-                <li><strong>Optional:</strong> Add a call-to-action to encourage engagement</li>
-                <li><strong>Select the post goal</strong> - educate, engage, promote, inspire, etc.</li>
-                <li><strong>Click "Generate Post"</strong> and your AI-powered LinkedIn post will be created!</li>
-            </ol>
-        </div>
-    """, unsafe_allow_html=True)
-    
     # Contact button
     st.markdown(f"""
         <div style="text-align: center; margin-top: 20px;">
@@ -233,6 +218,43 @@ if not st.session_state.authenticated:
 
 # Sidebar for user info and history
 with st.sidebar:
+    # Logo space at top
+    st.markdown("<div style='text-align: center; padding: 20px 0;'>", unsafe_allow_html=True)
+    try:
+        logo_path = os.path.join(os.path.dirname(__file__), "static", "logo.png")
+        if os.path.exists(logo_path):
+            st.image(logo_path, use_container_width=True)
+        else:
+            st.markdown("<div style='height: 100px; background: #f0f0f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999;'>LIPG Logo</div>", unsafe_allow_html=True)
+    except Exception:
+        st.markdown("<div style='height: 100px; background: #f0f0f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999;'>LIPG Logo</div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    st.divider()
+    
+    # User Manual in sidebar
+    with st.expander("📖 User Manual", expanded=False):
+        st.markdown("""
+        **Getting Started:**
+        1. Enter the **topic** of your LinkedIn post
+        2. Specify the **purpose** - what do you want to achieve?
+        3. Select your **target audience**
+        4. Enter the **key message** - the main point
+        5. Choose **tone intensity** and **language style**
+        6. Pick the **post length** and **formatting style**
+        7. (Optional) Add a **call-to-action**
+        8. Select the **post goal**
+        9. Click **"Generate Post"** to create your post!
+        
+        **Tips:**
+        - Be specific in your topic and message
+        - Choose the right audience for better results
+        - Experiment with different tones and styles
+        - Use the post history to review past posts
+        """)
+    
+    st.divider()
+    
     st.header("👤 User Info")
     st.success(f"Logged in as: **{st.session_state.username}**")
     if st.button("🚪 Logout"):
@@ -251,9 +273,15 @@ with st.sidebar:
         st.session_state.generated_post = ""
         st.session_state.visual_prompt = ""
         st.session_state.generating = False
+        st.session_state.form_reset = True
+        st.session_state.reset_key = str(datetime.now().timestamp())
+        st.rerun()
 
 # Main form
 col1, col2 = st.columns([1, 1])
+
+# Get reset key for form fields - changes on reset to clear all fields
+reset_key = st.session_state.get('reset_key', '0')
 
 with col1:
     st.header("📝 Post Details")
@@ -261,31 +289,38 @@ with col1:
     topic = st.text_input(
         "Topic *",
         placeholder="e.g., AI in Healthcare",
-        help="The main subject of your LinkedIn post"
+        help="The main subject of your LinkedIn post",
+        key=f"topic_{reset_key}"
     )
     
     purpose = st.text_area(
         "Purpose *",
         placeholder="e.g., To inform professionals about AI applications in healthcare",
-        help="What do you want to achieve with this post?"
+        help="What do you want to achieve with this post?",
+        key=f"purpose_{reset_key}"
     )
     
     audience = st.selectbox(
         "Target Audience",
         ["General", "Professionals", "Executives", "Entrepreneurs", "Students", "Industry Experts"],
-        help="Who is your target audience?"
+        index=0,
+        help="Who is your target audience?",
+        key=f"audience_{reset_key}"
     )
     
     message = st.text_area(
         "Key Message *",
         placeholder="e.g., AI is transforming healthcare delivery",
-        help="The main message you want to convey"
+        help="The main message you want to convey",
+        key=f"message_{reset_key}"
     )
     
     post_goal = st.selectbox(
         "Post Goal",
         ["Educate", "Engage", "Promote", "Inspire", "Inform", "Motivate", "Entertain", "Network", "Advocate"],
-        help="What is the primary goal of this post?"
+        index=0,
+        help="What is the primary goal of this post?",
+        key=f"post_goal_{reset_key}"
     )
 
 with col2:
@@ -295,46 +330,57 @@ with col2:
         "Template Type",
         options=list(get_all_templates().keys()),
         format_func=lambda x: get_template(x)['name'],
-        help="Choose a post template style"
+        index=0,
+        help="Choose a post template style",
+        key=f"template_{reset_key}"
     )
     
     tone_intensity = st.selectbox(
         "Tone Intensity",
         ["Very Light", "Light", "Moderate", "Strong", "Very Strong"],
         index=2,
-        help="How intense should the tone be?"
+        help="How intense should the tone be?",
+        key=f"tone_{reset_key}"
     )
     
     language_style = st.selectbox(
         "Language Style",
         ["Professional", "Casual", "Formal", "Conversational", "Technical", "Friendly"],
-        help="The style of language to use"
+        index=0,
+        help="The style of language to use",
+        key=f"language_{reset_key}"
     )
     
     post_length = st.selectbox(
         "Post Length",
         ["Very Short", "Short", "Medium", "Long", "Very Long"],
         index=2,
-        help="How long should the post be?"
+        help="How long should the post be?",
+        key=f"length_{reset_key}"
     )
     
     formatting = st.selectbox(
         "Formatting Style",
         ["Bullet Points", "Numbered List", "Paragraphs", "Mixed Format", "Question & Answer"],
-        help="How should the post be structured?"
+        index=0,
+        help="How should the post be structured?",
+        key=f"formatting_{reset_key}"
     )
     
     visual_style = st.selectbox(
         "Visual Style",
         ["photo_realistic", "illustration", "minimalist", "infographic", "abstract", "vintage", "modern_flat", "3d_render"],
         format_func=lambda x: x.replace("_", " ").title(),
-        help="Style for the visual prompt (for image generation)"
+        index=0,
+        help="Style for the visual prompt (for image generation)",
+        key=f"visual_{reset_key}"
     )
     
     cta = st.text_input(
         "Call-to-Action (Optional)",
         placeholder="e.g., What are your thoughts?",
-        help="Optional call-to-action for your post"
+        help="Optional call-to-action for your post",
+        key=f"cta_{reset_key}"
     )
 
 # Generate button
@@ -429,35 +475,15 @@ if st.session_state.generated_post:
         col_copy1, col_copy2, col_copy3, col_copy4 = st.columns([1, 1, 1, 1])
         
         with col_copy2:
-            # Copy to clipboard button with JavaScript
-            copy_button_clicked = st.button("📋 Copy to Clipboard", use_container_width=True, key="copy_btn")
-            
-            if copy_button_clicked:
-                # Use JavaScript to copy to clipboard
-                escaped_text = json.dumps(post_text)  # Escape for JavaScript
-                st.markdown(f"""
-                    <script>
-                        function copyToClipboard() {{
-                            const text = {escaped_text};
-                            navigator.clipboard.writeText(text).then(function() {{
-                                console.log('Copied to clipboard');
-                            }}, function(err) {{
-                                console.error('Failed to copy: ', err);
-                                // Fallback for older browsers
-                                const textarea = document.createElement('textarea');
-                                textarea.value = text;
-                                textarea.style.position = 'fixed';
-                                textarea.style.opacity = '0';
-                                document.body.appendChild(textarea);
-                                textarea.select();
-                                document.execCommand('copy');
-                                document.body.removeChild(textarea);
-                            }});
-                        }}
-                        copyToClipboard();
-                    </script>
-                """, unsafe_allow_html=True)
-                st.success("✅ Post copied to clipboard!")
+            # Copy to clipboard - use a text area that users can easily select and copy
+            st.markdown("**Copy Post:**")
+            st.text_area(
+                "Select all text and copy (Ctrl+A, Ctrl+C)",
+                value=post_text,
+                height=150,
+                key="copy_post_area",
+                label_visibility="collapsed"
+            )
         
         with col_copy3:
             # Download HTML button
@@ -547,7 +573,84 @@ if st.session_state.get('show_history', False):
                         st.write(f"**Topic:** {post_data.get('topic', 'N/A')}")
                         st.write(f"**Purpose:** {post_data.get('purpose', 'N/A')}")
                         st.write(f"**Generated Post:**")
-                        st.text(post_data.get('generated_post', 'N/A'))
+                        
+                        post_text_history = post_data.get('generated_post', 'N/A')
+                        st.text(post_text_history)
+                        
+                        # Download HTML button for this post
+                        if post_text_history != 'N/A':
+                            escaped_post_text = html.escape(post_text_history)
+                            html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkedIn Post - {post_data.get('date', 'N/A')}</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            line-height: 1.6;
+        }}
+        .post-container {{
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid #0077b5;
+        }}
+        .post-title {{
+            color: #0077b5;
+            font-size: 24px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }}
+        .post-meta {{
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+        }}
+        .post-content {{
+            white-space: pre-wrap;
+            font-size: 16px;
+            color: #333;
+            line-height: 1.8;
+        }}
+        .footer {{
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="post-container">
+        <div class="post-title">LinkedIn Post</div>
+        <div class="post-meta">
+            <strong>Topic:</strong> {html.escape(str(post_data.get('topic', 'N/A')))}<br>
+            <strong>Purpose:</strong> {html.escape(str(post_data.get('purpose', 'N/A')))}<br>
+            <strong>Date:</strong> {html.escape(str(post_data.get('date', 'N/A')))}
+        </div>
+        <div class="post-content">{escaped_post_text}</div>
+    </div>
+    <div class="footer">
+        Generated on {post_data.get('date', 'N/A')}
+    </div>
+</body>
+</html>"""
+                            
+                            b64_html = base64.b64encode(html_content.encode('utf-8')).decode()
+                            filename = f"linkedin_post_{post_data.get('date', 'N/A').replace('/', '_').replace(' ', '_')}.html"
+                            href = f'<a href="data:text/html;charset=utf-8;base64,{b64_html}" download="{filename}" style="text-decoration: none; color: white; background-color: #0077b5; padding: 8px 16px; border-radius: 5px; display: inline-block; font-weight: 500; margin-top: 10px;">📥 Download HTML</a>'
+                            st.markdown(href, unsafe_allow_html=True)
             else:
                 st.info("No post history found.")
         except Exception as e:
