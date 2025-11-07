@@ -248,15 +248,18 @@ elif page == "Company Management":
     
     with tab2:
         st.subheader("➕ Add New Company")
-        with st.form("add_company_form"):
-            company_name = st.text_input("Company Name *", help="Name of the company")
-            subscription_type = st.selectbox("Subscription Type *", ["monthly", "annual"], index=0)
-            start_date = st.date_input("Start Date", value=datetime.now().date())
-            expiration_date = st.date_input("Expiration Date", 
-                                           value=(datetime.now() + timedelta(days=30)).date() if subscription_type == "monthly" 
-                                           else (datetime.now() + timedelta(days=365)).date())
+        with st.form("add_company_form", clear_on_submit=True):
+            company_name = st.text_input("Company Name *", help="Name of the company", key="new_company_name")
+            subscription_type = st.selectbox("Subscription Type *", ["monthly", "annual"], index=0, key="new_sub_type")
             
-            if st.form_submit_button("Create Company", type="primary"):
+            # Calculate default expiration based on subscription type
+            default_expiration = (datetime.now() + timedelta(days=30)).date() if subscription_type == "monthly" else (datetime.now() + timedelta(days=365)).date()
+            
+            start_date = st.date_input("Start Date", value=datetime.now().date(), key="new_start_date")
+            expiration_date = st.date_input("Expiration Date", value=default_expiration, key="new_exp_date")
+            
+            submitted = st.form_submit_button("Create Company", type="primary")
+            if submitted:
                 if company_name:
                     success, company_id = create_company(
                         company_name, 
@@ -266,11 +269,16 @@ elif page == "Company Management":
                     )
                     if success:
                         st.success(f"✅ Company created successfully! Company ID: {company_id}")
-                        st.rerun()
+                        st.session_state.company_created = True
                     else:
                         st.error(f"❌ Error: {company_id}")
                 else:
                     st.error("⚠️ Company name is required")
+        
+        # Rerun after successful creation (outside form to avoid form resubmission)
+        if st.session_state.get('company_created', False):
+            st.session_state.company_created = False
+            st.rerun()
     
     with tab3:
         st.subheader("⚙️ Manage Existing Company")
@@ -327,20 +335,40 @@ elif page == "Company Management":
                         
                         with col2:
                             st.subheader("Update Subscription")
-                            with st.form("update_subscription_form"):
-                                new_sub_type = st.selectbox("Subscription Type", ["monthly", "annual"],
-                                                           index=0 if company_info.get('subscription_type') == 'monthly' else 1)
-                                new_start = st.date_input("Start Date", 
-                                                         value=datetime.fromisoformat(company_info.get('start_date', datetime.now().isoformat()).split('T')[0]).date())
-                                new_expiration = st.date_input("Expiration Date",
-                                                              value=datetime.fromisoformat(company_info.get('expiration_date', datetime.now().isoformat()).split('T')[0]).date())
-                                if st.form_submit_button("Update Subscription"):
+                            sub_key = f"sub_type_{selected_company_id}"
+                            if sub_key not in st.session_state:
+                                st.session_state[sub_key] = company_info.get('subscription_type', 'monthly')
+                            
+                            new_sub_type = st.selectbox("Subscription Type", ["monthly", "annual"],
+                                                       index=0 if st.session_state[sub_key] == 'monthly' else 1,
+                                                       key=f"sub_select_{selected_company_id}")
+                            
+                            start_date_str = company_info.get('start_date', datetime.now().isoformat())
+                            if 'T' in start_date_str:
+                                start_date_val = datetime.fromisoformat(start_date_str.split('T')[0]).date()
+                            else:
+                                start_date_val = datetime.fromisoformat(start_date_str).date()
+                            
+                            exp_date_str = company_info.get('expiration_date', datetime.now().isoformat())
+                            if 'T' in exp_date_str:
+                                exp_date_val = datetime.fromisoformat(exp_date_str.split('T')[0]).date()
+                            else:
+                                exp_date_val = datetime.fromisoformat(exp_date_str).date()
+                            
+                            new_start = st.date_input("Start Date", value=start_date_val, key=f"start_date_{selected_company_id}")
+                            new_expiration = st.date_input("Expiration Date", value=exp_date_val, key=f"exp_date_{selected_company_id}")
+                            
+                            if st.button("Update Subscription", key=f"sub_btn_{selected_company_id}"):
+                                if (new_sub_type != company_info.get('subscription_type') or 
+                                    new_start.isoformat() != start_date_str.split('T')[0] or
+                                    new_expiration.isoformat() != exp_date_str.split('T')[0]):
                                     success, message = update_company_subscription(
                                         selected_company_id, new_sub_type, 
                                         new_start.isoformat(), new_expiration.isoformat()
                                     )
                                     if success:
                                         st.success(message)
+                                        st.session_state[sub_key] = new_sub_type
                                         st.rerun()
                                     else:
                                         st.error(message)
@@ -413,33 +441,39 @@ elif page == "User Management":
     
     with tab2:
         st.subheader("➕ Add New User")
-        with st.form("add_user_form"):
-            new_username = st.text_input("Username *", help="Unique username for the user")
-            new_password = st.text_input("Password *", type="password", help="User's password")
-            new_email = st.text_input("Email (Optional)", help="User's email address")
+        with st.form("add_user_form", clear_on_submit=True):
+            new_username = st.text_input("Username *", help="Unique username for the user", key="new_username")
+            new_password = st.text_input("Password *", type="password", help="User's password", key="new_password")
+            new_email = st.text_input("Email (Optional)", help="User's email address", key="new_email")
             
             # Company selection
             companies = get_all_companies()
             company_options = [None] + [c['id'] for c in companies]
             company_labels = ["No Company"] + [f"{c['id']} - {c['name']}" for c in companies]
             selected_company_idx = st.selectbox("Company (Optional)", range(len(company_options)), 
-                                                format_func=lambda x: company_labels[x])
+                                                format_func=lambda x: company_labels[x], key="new_company_select")
             selected_company_id = company_options[selected_company_idx] if selected_company_idx > 0 else None
             
-            new_tier = st.selectbox("Tier *", ["Basic", "Standard", "Premium"], index=0, help="User subscription tier")
-            new_role = st.selectbox("Role *", ["Admin", "User", "Viewer"], index=1, help="User role within company")
-            enabled = st.checkbox("Enable User", value=True, help="User can login if enabled")
+            new_tier = st.selectbox("Tier *", ["Basic", "Standard", "Premium"], index=0, help="User subscription tier", key="new_tier")
+            new_role = st.selectbox("Role *", ["Admin", "User", "Viewer"], index=1, help="User role within company", key="new_role")
+            enabled = st.checkbox("Enable User", value=True, help="User can login if enabled", key="new_enabled")
             
-            if st.form_submit_button("Create User", type="primary"):
+            submitted = st.form_submit_button("Create User", type="primary")
+            if submitted:
                 if new_username and new_password:
                     success, message = create_user(new_username, new_password, enabled, new_email, new_tier, selected_company_id, new_role)
                     if success:
                         st.success(f"✅ {message}")
-                        st.rerun()
+                        st.session_state.user_created = True
                     else:
                         st.error(f"❌ {message}")
                 else:
                     st.error("⚠️ Username and password are required")
+        
+        # Rerun after successful creation (outside form to avoid form resubmission)
+        if st.session_state.get('user_created', False):
+            st.session_state.user_created = False
+            st.rerun()
     
     with tab3:
         st.subheader("⚙️ Manage Existing User")
@@ -491,64 +525,88 @@ elif page == "User Management":
                         
                         with col2:
                             st.subheader("Change Tier")
-                            with st.form("change_tier_form"):
-                                new_tier = st.selectbox("Select Tier", ["Basic", "Standard", "Premium"], 
-                                                       index=["Basic", "Standard", "Premium"].index(user_info.get('tier', 'Basic')))
-                                if st.form_submit_button("Update Tier"):
+                            tier_key = f"tier_{selected_username}"
+                            if tier_key not in st.session_state:
+                                st.session_state[tier_key] = user_info.get('tier', 'Basic')
+                            
+                            new_tier = st.selectbox("Select Tier", ["Basic", "Standard", "Premium"], 
+                                                   index=["Basic", "Standard", "Premium"].index(st.session_state[tier_key]),
+                                                   key=f"tier_select_{selected_username}")
+                            
+                            if st.button("Update Tier", key=f"tier_btn_{selected_username}"):
+                                if new_tier != user_info.get('tier', 'Basic'):
                                     success, message = update_user_tier(selected_username, new_tier)
                                     if success:
                                         st.success(message)
+                                        st.session_state[tier_key] = new_tier
                                         st.rerun()
                                     else:
                                         st.error(message)
                         
                         with col3:
                             st.subheader("Change Role")
-                            with st.form("change_role_form"):
-                                new_role = st.selectbox("Select Role", ["Admin", "User", "Viewer"],
-                                                       index=["Admin", "User", "Viewer"].index(user_info.get('role', 'User')))
-                                if st.form_submit_button("Update Role"):
+                            role_key = f"role_{selected_username}"
+                            if role_key not in st.session_state:
+                                st.session_state[role_key] = user_info.get('role', 'User')
+                            
+                            new_role = st.selectbox("Select Role", ["Admin", "User", "Viewer"],
+                                                   index=["Admin", "User", "Viewer"].index(st.session_state[role_key]),
+                                                   key=f"role_select_{selected_username}")
+                            
+                            if st.button("Update Role", key=f"role_btn_{selected_username}"):
+                                if new_role != user_info.get('role', 'User'):
                                     success, message = update_user_role(selected_username, new_role)
                                     if success:
                                         st.success(message)
+                                        st.session_state[role_key] = new_role
                                         st.rerun()
                                     else:
                                         st.error(message)
                         
                         with col4:
                             st.subheader("Change Company")
-                            with st.form("change_company_form"):
-                                companies = get_all_companies()
-                                company_options = [None] + [c['id'] for c in companies]
-                                company_labels = ["No Company"] + [f"{c['id']} - {c['name']}" for c in companies]
-                                current_company_idx = 0 if not user_info.get('company_id') else (
-                                    company_options.index(user_info.get('company_id')) if user_info.get('company_id') in company_options else 0
-                                )
-                                new_company_idx = st.selectbox("Select Company", range(len(company_options)),
-                                                              index=current_company_idx,
-                                                              format_func=lambda x: company_labels[x])
-                                new_company_id = company_options[new_company_idx] if new_company_idx > 0 else None
-                                if st.form_submit_button("Update Company"):
+                            companies = get_all_companies()
+                            company_options = [None] + [c['id'] for c in companies]
+                            company_labels = ["No Company"] + [f"{c['id']} - {c['name']}" for c in companies]
+                            current_company_id = user_info.get('company_id')
+                            current_company_idx = 0 if not current_company_id else (
+                                company_options.index(current_company_id) if current_company_id in company_options else 0
+                            )
+                            
+                            company_key = f"company_{selected_username}"
+                            if company_key not in st.session_state:
+                                st.session_state[company_key] = current_company_idx
+                            
+                            new_company_idx = st.selectbox("Select Company", range(len(company_options)),
+                                                          index=st.session_state[company_key],
+                                                          format_func=lambda x: company_labels[x],
+                                                          key=f"company_select_{selected_username}")
+                            new_company_id = company_options[new_company_idx] if new_company_idx > 0 else None
+                            
+                            if st.button("Update Company", key=f"company_btn_{selected_username}"):
+                                if new_company_id != current_company_id:
                                     success, message = update_user_company(selected_username, new_company_id)
                                     if success:
                                         st.success(message)
+                                        st.session_state[company_key] = new_company_idx
                                         st.rerun()
                                     else:
                                         st.error(message)
                         
                         with col5:
                             st.subheader("Reset Password")
-                            with st.form("reset_password_form"):
-                                new_password = st.text_input("New Password", type="password", key="reset_pwd")
-                                if st.form_submit_button("Update Password"):
-                                    if new_password:
-                                        success, message = update_user_password(selected_username, new_password)
-                                        if success:
-                                            st.success(message)
-                                        else:
-                                            st.error(message)
+                            new_password = st.text_input("New Password", type="password", key=f"reset_pwd_{selected_username}")
+                            if st.button("Update Password", key=f"pwd_btn_{selected_username}"):
+                                if new_password:
+                                    success, message = update_user_password(selected_username, new_password)
+                                    if success:
+                                        st.success(message)
+                                        # Clear password field
+                                        st.session_state[f"reset_pwd_{selected_username}"] = ""
                                     else:
-                                        st.error("Please enter a new password")
+                                        st.error(message)
+                                else:
+                                    st.error("Please enter a new password")
                         
                         st.divider()
                         col_delete = st.columns(1)[0]
