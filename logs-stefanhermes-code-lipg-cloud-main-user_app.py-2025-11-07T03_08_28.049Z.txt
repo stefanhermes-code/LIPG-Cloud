@@ -1,0 +1,156 @@
+
+[     UTC     ] Logs for lipg-cloud-user.streamlit.app/
+────────────────────────────────────────────────────────────────────────────────────────
+[03:05:58] 🖥 Provisioning machine...
+[03:05:58] 🎛 Preparing system...
+[03:05:58] ⛓ Spinning up manager process...
+[03:05:58] 🚀 Starting up repository: 'lipg-cloud', branch: 'main', main module: 'user_app.py'
+[03:05:58] 🐙 Cloning repository...
+[03:05:58] 🐙 Cloning into '/mount/src/lipg-cloud'...
+
+[03:05:58] 🐙 Cloned repository!
+[03:05:58] 🐙 Pulling code changes from Github...
+[03:05:58] 📦 Processing dependencies...
+
+──────────────────────────────────────── uv ───────────────────────────────────────────
+
+Using uv pip install.
+Using Python 3.13.9 environment at /home/adminuser/venv
+Resolved 58 packages in 618ms
+Prepared 58 packages in 1m 45s
+Installed 58 packages in 100ms
+ + altair==5.5.0
+ + annotated-types==0.7.0
+ + anyio==3.7.1
+ + attrs==25.4.0
+ + blinker==1.9.0
+ + cachetools==5.5.2
+ + certifi==2025.10.5
+ + charset-normalizer==3.4.4
+ + click==8.3.0
+ + distro==1.9.0
+ + gitdb==4.0.12
+ + gitpython==3.1.45
+ + [2025-11-07 03:07:45.020643] h11==0.16.0
+ + httpcore==1.0.9
+ + httpx==0.28.1
+ + idna==3.11
+ + importlib-metadata==6.11.0
+ + jinja2==3.1.6
+ + jsonschema==4.25.1
+ + jsonschema-specifications==2025.9.1
+ + markdown-it-py==4.0.0
+ + markupsafe==[2025-11-07 03:07:45.020870] 3.0.3
+ + mdurl==0.1.2
+ + narwhals==2.10.2
+ + numpy==1.26.4
+ + openai==1.3.0
+ + packaging==23.2
+ + pandas==2.3.3
+ + pillow==10.4.0
+ +[2025-11-07 03:07:45.021088]  protobuf==4.25.8
+ + pyarrow==22.0.0
+ + pydantic==2.12.4
+ + pydantic-core==2.41.5
+ + pydeck==0.9.1
+ + pygments[2025-11-07 03:07:45.021275] ==2.19.2
+ + python-dateutil==2.9.0.post0
+ + python-dotenv==1.0.0
+ + pytz==2025.2
+ + referencing==0.37.0
+ + requests==2.32.5
+ + rich==13.9.4
+ [2025-11-07 03:07:45.021461] + rpds-py==0.28.0
+ + six==1.17.0
+ + smmap==5.0.2
+ + sniffio==1.3.1
+ + streamlit==1.28.0
+ + tenacity[2025-11-07 03:07:45.021590] ==8.5.0
+ + toml==0.10.2
+ + tornado==6.5.2
+ + tqdm==4.67.1
+ + typing-extensions==4.15.0
+ + typing-inspection==0.4.2
+ + tzdata==2025.2
+ [2025-11-07 03:07:45.021755] + tzlocal==5.3.1
+ + urllib3==2.5.0
+ + validators==0.35.0
+ + watchdog==6.0.0
+ [2025-11-07 03:07:45.021916] + zipp==3.23.0
+Checking if Streamlit is installed
+/home/adminuser/venv/lib/python3.13/site-packages/streamlit/elements/lib/column_types.py:442: SyntaxWarning: invalid escape sequence '\.'
+  >>>             validate="^st\.[a-z_]+$",
+/home/adminuser/venv/lib/python3.13/site-packages/streamlit/elements/lib/column_types.py:540: SyntaxWarning: invalid escape sequence '\.'
+  >>>             validate="^https://[a-z]+\.streamlit\.app$",
+/home/adminuser/venv/lib/python3.13/site-packages/streamlit/elements/layouts.py:461: SyntaxWarning: invalid escape sequence '\.'
+  backslash-escaping them. E.g. ``1\. Not an ordered list``.
+Found Streamlit version 1.28.0 in the environment
+Installing rich for an improved exception logging
+Using uv pip install.
+Using Python 3.13.9 environment at /home/adminuser/venv
+Audited 1 package in 3ms
+
+────────────────────────────────────────────────────────────────────────────────────────
+
+[03:07:48] 🐍 Python dependencies were installed from /mount/src/lipg-cloud/requirements.txt using uv.
+Check if streamlit is installed
+Streamlit is already installed
+[03:07:49] 📦 Processed dependencies!
+
+
+
+
+  A new version of Streamlit is available.
+
+  See what's new at https://discuss.streamlit.io/c/announcements
+
+  Enter the following command to upgrade:
+  $ pip install streamlit --upgrade
+
+────────────────────── Traceback (most recent call last) ───────────────────────
+  /home/adminuser/venv/lib/python3.13/site-packages/streamlit/runtime/scriptru  
+  nner/script_runner.py:534 in _run_script                                      
+                                                                                
+  /mount/src/lipg-cloud/user_app.py:15 in <module>                              
+                                                                                
+     12 # Ensure we can import from shared_utils when app is at repo root       
+     13 sys.path.append(os.path.dirname(os.path.abspath(__file__)))             
+     14                                                                         
+  ❱  15 from shared_utils.post_generator import generate_ai_post, generate_vis  
+     16 from shared_utils.data_manager import save_post_to_database, get_user_  
+     17 from shared_utils.config_loader import load_customer_config             
+     18 from shared_utils.templates_config import get_template, get_all_templa  
+                                                                                
+  /mount/src/lipg-cloud/shared_utils/post_generator.py:19 in <module>           
+                                                                                
+     16 if not OPENAI_API_KEY:                                                  
+     17 │   raise ValueError("OPENAI_API_KEY environment variable is not set")  
+     18                                                                         
+  ❱  19 client = OpenAI(api_key=OPENAI_API_KEY)                                 
+     20                                                                         
+     21 # Input validation functions                                            
+     22 def validate_input(text, field_name, max_length=500):                   
+                                                                                
+  /home/adminuser/venv/lib/python3.13/site-packages/openai/_client.py:107 in    
+  __init__                                                                      
+                                                                                
+    104 │   │   if base_url is None:                                            
+    105 │   │   │   base_url = f"https://api.openai.com/v1"                     
+    106 │   │                                                                   
+  ❱ 107 │   │   super().__init__(                                               
+    108 │   │   │   version=__version__,                                        
+    109 │   │   │   base_url=base_url,                                          
+    110 │   │   │   max_retries=max_retries,                                    
+                                                                                
+  /home/adminuser/venv/lib/python3.13/site-packages/openai/_base_client.py:738  
+  in __init__                                                                   
+                                                                                
+     735 │   │   │   custom_headers=custom_headers,                             
+     736 │   │   │   _strict_response_validation=_strict_response_validation,   
+     737 │   │   )                                                              
+  ❱  738 │   │   self._client = http_client or httpx.Client(                    
+     739 │   │   │   base_url=base_url,                                         
+     740 │   │   │   # cast to a valid type because mypy doesn't understand ou  
+     741 │   │   │   timeout=cast(Timeout, timeout),                            
+────────────────────────────────────────────────────────────────────────────────
+TypeError: Client.__init__() got an unexpected keyword argument 'proxies'

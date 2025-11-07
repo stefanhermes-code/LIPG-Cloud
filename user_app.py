@@ -13,7 +13,12 @@ import json
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from shared_utils.post_generator import generate_ai_post, generate_visual_prompt
-from shared_utils.data_manager import save_post_to_database, get_user_post_history
+from shared_utils.data_manager import (
+    save_post_to_database, 
+    get_user_post_history,
+    authenticate_user,
+    update_last_login
+)
 from shared_utils.config_loader import load_customer_config
 from shared_utils.templates_config import get_template, get_all_templates
 
@@ -26,8 +31,10 @@ st.set_page_config(
 )
 
 # Initialize session state
-if 'user_id' not in st.session_state:
-    st.session_state.user_id = None
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+if 'username' not in st.session_state:
+    st.session_state.username = None
 if 'generated_post' not in st.session_state:
     st.session_state.generated_post = ""
 if 'visual_prompt' not in st.session_state:
@@ -191,25 +198,47 @@ with st.expander("📖 How to Use - Step-by-Step Instructions", expanded=False):
         </div>
     """, unsafe_allow_html=True)
 
+# User Authentication
+if not st.session_state.authenticated:
+    st.title("🔐 Login to LinkedIn Post Generator")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        with st.container():
+            username = st.text_input("Username", key="login_username")
+            password = st.text_input("Password", type="password", key="login_password")
+            
+            if st.button("Login", type="primary", use_container_width=True):
+                if username and password:
+                    success, message = authenticate_user(username, password)
+                    if success:
+                        st.session_state.authenticated = True
+                        st.session_state.username = username
+                        update_last_login(username)
+                        st.success("✅ Login successful!")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ {message}")
+                else:
+                    st.error("⚠️ Please enter both username and password")
+    
+    st.stop()  # Stop execution until authenticated
+
 # Sidebar for user info and history
 with st.sidebar:
     st.header("👤 User Info")
-    if st.session_state.user_id:
-        st.success(f"Logged in as: {st.session_state.user_id}")
-    else:
-        # Simple user identification (in production, use proper authentication)
-        user_id = st.text_input("Enter your user ID", key="user_input")
-        if st.button("Set User ID"):
-            st.session_state.user_id = user_id
-            st.rerun()
+    st.success(f"Logged in as: **{st.session_state.username}**")
+    if st.button("🚪 Logout"):
+        st.session_state.authenticated = False
+        st.session_state.username = None
+        st.session_state.generated_post = ""
+        st.session_state.visual_prompt = ""
+        st.rerun()
     
     st.divider()
     st.header("📊 Quick Actions")
     if st.button("📜 View Post History"):
-        if st.session_state.user_id:
-            st.session_state.show_history = True
-        else:
-            st.warning("Please set your user ID first")
+        st.session_state.show_history = True
     
     if st.button("🔄 Reset Form"):
         st.session_state.generated_post = ""
@@ -336,9 +365,9 @@ if generate_button:
                     st.session_state.visual_prompt = visual_prompt
                     
                     # Save to database
-                    if st.session_state.user_id:
+                    if st.session_state.username:
                         save_post_to_database(
-                            user_id=st.session_state.user_id,
+                            user_id=st.session_state.username,
                             topic=topic,
                             purpose=purpose,
                             audience=audience,
@@ -391,9 +420,9 @@ if st.session_state.get('show_history', False):
     st.divider()
     st.header("📜 Post History")
     
-    if st.session_state.user_id:
+    if st.session_state.username:
         try:
-            history = get_user_post_history(st.session_state.user_id)
+            history = get_user_post_history(st.session_state.username)
             if history:
                 for idx, post_data in enumerate(history[:10]):  # Show last 10 posts
                     with st.expander(f"Post #{idx+1} - {post_data.get('topic', 'N/A')} ({post_data.get('date', 'N/A')})"):
@@ -405,8 +434,6 @@ if st.session_state.get('show_history', False):
                 st.info("No post history found.")
         except Exception as e:
             st.error(f"Error loading history: {str(e)}")
-    else:
-        st.warning("Please set your user ID to view post history")
     
     if st.button("Close History"):
         st.session_state.show_history = False

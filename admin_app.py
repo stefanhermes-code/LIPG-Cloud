@@ -18,7 +18,13 @@ from shared_utils.data_manager import (
     get_user_stats, 
     get_all_users,
     delete_post,
-    get_analytics_data
+    get_analytics_data,
+    get_all_auth_users,
+    create_user,
+    delete_user,
+    enable_disable_user,
+    update_user_password,
+    get_user
 )
 from shared_utils.config_loader import load_customer_config, save_customer_config
 
@@ -185,37 +191,130 @@ if page == "Dashboard":
 elif page == "User Management":
     st.header("👥 User Management")
     
-    try:
-        users = get_all_users()
-        
-        if users:
-            st.subheader("All Users")
-            df_users = pd.DataFrame(users)
-            
-            # User statistics
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Total Users", len(users))
-            
-            with col2:
-                active_users = len([u for u in users if u.get('post_count', 0) > 0])
-                st.metric("Active Users", active_users)
-            
-            # Display users table
-            st.dataframe(df_users, use_container_width=True)
-            
-            # User actions
-            st.subheader("User Actions")
-            selected_user = st.selectbox("Select User", [u['user_id'] for u in users])
-            
-            if selected_user:
-                user_stats = get_user_stats(user_id=selected_user)
-                st.json(user_stats)
-        else:
-            st.info("No users found")
+    # Tabs for different user management actions
+    tab1, tab2, tab3 = st.tabs(["View Users", "Add New User", "Manage Existing User"])
     
-    except Exception as e:
-        st.error(f"Error loading users: {str(e)}")
+    with tab1:
+        st.subheader("All Users")
+        try:
+            users = get_all_auth_users()
+            
+            if users:
+                # Statistics
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Total Users", len(users))
+                with col2:
+                    enabled_count = len([u for u in users if u.get('enabled', True)])
+                    st.metric("Enabled Users", enabled_count)
+                with col3:
+                    disabled_count = len([u for u in users if not u.get('enabled', True)])
+                    st.metric("Disabled Users", disabled_count)
+                
+                # Display users table
+                df_users = pd.DataFrame(users)
+                # Format dates
+                if 'created_date' in df_users.columns:
+                    df_users['created_date'] = pd.to_datetime(df_users['created_date']).dt.strftime('%Y-%m-%d %H:%M')
+                if 'last_login' in df_users.columns:
+                    df_users['last_login'] = df_users['last_login'].apply(lambda x: pd.to_datetime(x).strftime('%Y-%m-%d %H:%M') if x else 'Never')
+                
+                st.dataframe(df_users, use_container_width=True)
+            else:
+                st.info("No users found. Create your first user in the 'Add New User' tab.")
+        except Exception as e:
+            st.error(f"Error loading users: {str(e)}")
+    
+    with tab2:
+        st.subheader("➕ Add New User")
+        with st.form("add_user_form"):
+            new_username = st.text_input("Username *", help="Unique username for the user")
+            new_password = st.text_input("Password *", type="password", help="User's password")
+            new_email = st.text_input("Email (Optional)", help="User's email address")
+            enabled = st.checkbox("Enable User", value=True, help="User can login if enabled")
+            
+            if st.form_submit_button("Create User", type="primary"):
+                if new_username and new_password:
+                    success, message = create_user(new_username, new_password, enabled, new_email)
+                    if success:
+                        st.success(f"✅ {message}")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ {message}")
+                else:
+                    st.error("⚠️ Username and password are required")
+    
+    with tab3:
+        st.subheader("⚙️ Manage Existing User")
+        try:
+            users = get_all_auth_users()
+            if users:
+                selected_username = st.selectbox("Select User", [u['username'] for u in users])
+                
+                if selected_username:
+                    user_info = get_user(selected_username)
+                    if user_info:
+                        st.write(f"**Username:** {user_info.get('username')}")
+                        st.write(f"**Email:** {user_info.get('email', 'N/A')}")
+                        st.write(f"**Status:** {'✅ Enabled' if user_info.get('enabled', True) else '❌ Disabled'}")
+                        st.write(f"**Created:** {user_info.get('created_date', 'N/A')}")
+                        st.write(f"**Last Login:** {user_info.get('last_login', 'Never')}")
+                        
+                        st.divider()
+                        
+                        # Actions
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            if user_info.get('enabled', True):
+                                if st.button("🚫 Disable User", type="secondary"):
+                                    success, message = enable_disable_user(selected_username, False)
+                                    if success:
+                                        st.success(message)
+                                        st.rerun()
+                                    else:
+                                        st.error(message)
+                            else:
+                                if st.button("✅ Enable User", type="primary"):
+                                    success, message = enable_disable_user(selected_username, True)
+                                    if success:
+                                        st.success(message)
+                                        st.rerun()
+                                    else:
+                                        st.error(message)
+                        
+                        with col2:
+                            st.subheader("Reset Password")
+                            with st.form("reset_password_form"):
+                                new_password = st.text_input("New Password", type="password", key="reset_pwd")
+                                if st.form_submit_button("Update Password"):
+                                    if new_password:
+                                        success, message = update_user_password(selected_username, new_password)
+                                        if success:
+                                            st.success(message)
+                                        else:
+                                            st.error(message)
+                                    else:
+                                        st.error("Please enter a new password")
+                        
+                        with col3:
+                            st.subheader("Delete User")
+                            if st.button("🗑️ Delete User", type="secondary"):
+                                if st.session_state.get('confirm_delete') != selected_username:
+                                    st.session_state.confirm_delete = selected_username
+                                    st.warning("⚠️ Click again to confirm deletion")
+                                else:
+                                    success, message = delete_user(selected_username)
+                                    if success:
+                                        st.success(message)
+                                        st.session_state.confirm_delete = None
+                                        st.rerun()
+                                    else:
+                                        st.error(message)
+            else:
+                st.info("No users found. Create your first user in the 'Add New User' tab.")
+        except Exception as e:
+            st.error(f"Error managing users: {str(e)}")
 
 # Post Management
 elif page == "Post Management":

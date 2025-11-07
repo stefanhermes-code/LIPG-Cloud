@@ -18,6 +18,7 @@ _base_dir = Path(__file__).parent.parent  # Go up from shared_utils to LIPG Clou
 DATA_DIR = _base_dir / "data"
 POSTS_FILE = DATA_DIR / "posts.json"
 USERS_FILE = DATA_DIR / "users.json"
+AUTH_FILE = DATA_DIR / "auth.json"  # User authentication data
 
 # Ensure data directory exists
 DATA_DIR.mkdir(exist_ok=True)
@@ -207,3 +208,131 @@ def get_analytics_data():
     except Exception as e:
         logging.error(f"Error getting analytics data: {str(e)}")
         return {}
+
+# User Authentication Functions
+def authenticate_user(username, password):
+    """Authenticate a user with username and password"""
+    try:
+        auth_data = _load_json_file(AUTH_FILE)
+        for user in auth_data:
+            if user.get('username') == username:
+                if not user.get('enabled', True):
+                    return False, "User account is disabled"
+                if user.get('password') == password:
+                    return True, "Authentication successful"
+                else:
+                    return False, "Incorrect password"
+        return False, "User not found"
+    except Exception as e:
+        logging.error(f"Error authenticating user: {str(e)}")
+        return False, f"Authentication error: {str(e)}"
+
+def get_user(username):
+    """Get user information by username"""
+    try:
+        auth_data = _load_json_file(AUTH_FILE)
+        for user in auth_data:
+            if user.get('username') == username:
+                # Don't return password
+                user_info = user.copy()
+                user_info.pop('password', None)
+                return user_info
+        return None
+    except Exception as e:
+        logging.error(f"Error getting user: {str(e)}")
+        return None
+
+def create_user(username, password, enabled=True, email=""):
+    """Create a new user account"""
+    try:
+        auth_data = _load_json_file(AUTH_FILE)
+        
+        # Check if user already exists
+        for user in auth_data:
+            if user.get('username') == username:
+                return False, "Username already exists"
+        
+        # Create new user
+        new_user = {
+            "username": username,
+            "password": password,  # In production, hash this
+            "enabled": enabled,
+            "email": email,
+            "created_date": datetime.now().isoformat(),
+            "last_login": None
+        }
+        
+        auth_data.append(new_user)
+        _save_json_file(AUTH_FILE, auth_data)
+        return True, "User created successfully"
+    except Exception as e:
+        logging.error(f"Error creating user: {str(e)}")
+        return False, f"Error creating user: {str(e)}"
+
+def update_user_password(username, new_password):
+    """Update user password"""
+    try:
+        auth_data = _load_json_file(AUTH_FILE)
+        for user in auth_data:
+            if user.get('username') == username:
+                user['password'] = new_password  # In production, hash this
+                _save_json_file(AUTH_FILE, auth_data)
+                return True, "Password updated successfully"
+        return False, "User not found"
+    except Exception as e:
+        logging.error(f"Error updating password: {str(e)}")
+        return False, f"Error updating password: {str(e)}"
+
+def enable_disable_user(username, enabled):
+    """Enable or disable a user account"""
+    try:
+        auth_data = _load_json_file(AUTH_FILE)
+        for user in auth_data:
+            if user.get('username') == username:
+                user['enabled'] = enabled
+                _save_json_file(AUTH_FILE, auth_data)
+                return True, f"User {'enabled' if enabled else 'disabled'} successfully"
+        return False, "User not found"
+    except Exception as e:
+        logging.error(f"Error updating user status: {str(e)}")
+        return False, f"Error updating user status: {str(e)}"
+
+def delete_user(username):
+    """Delete a user account"""
+    try:
+        auth_data = _load_json_file(AUTH_FILE)
+        auth_data = [u for u in auth_data if u.get('username') != username]
+        _save_json_file(AUTH_FILE, auth_data)
+        return True, "User deleted successfully"
+    except Exception as e:
+        logging.error(f"Error deleting user: {str(e)}")
+        return False, f"Error deleting user: {str(e)}"
+
+def get_all_auth_users():
+    """Get all authenticated users (without passwords)"""
+    try:
+        auth_data = _load_json_file(AUTH_FILE)
+        # Remove passwords from response
+        users = []
+        for user in auth_data:
+            user_info = user.copy()
+            user_info.pop('password', None)
+            users.append(user_info)
+        return users
+    except Exception as e:
+        logging.error(f"Error getting auth users: {str(e)}")
+        return []
+
+def update_last_login(username):
+    """Update user's last login timestamp"""
+    try:
+        auth_data = _load_json_file(AUTH_FILE)
+        for user in auth_data:
+            if user.get('username') == username:
+                user['last_login'] = datetime.now().isoformat()
+                _save_json_file(AUTH_FILE, auth_data)
+                return True
+        return False
+    except Exception as e:
+        logging.error(f"Error updating last login: {str(e)}")
+        return False
