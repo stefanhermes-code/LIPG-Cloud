@@ -62,9 +62,19 @@ def _save_json_file(filepath, data):
         logging.info(f"Successfully saved {filepath}")
         
         # Sync to GitHub if token is available and file should be tracked
-        tracked_files = [AUTH_FILE, COMPANIES_FILE]  # Only sync tracked files
-        if filepath in tracked_files:
-            _sync_to_github(filepath)
+        # Compare using resolved paths to handle symlinks and different path formats
+        tracked_files = [AUTH_FILE.resolve(), COMPANIES_FILE.resolve()]
+        filepath_resolved = filepath.resolve()
+        
+        if filepath_resolved in tracked_files:
+            logging.info(f"File {filepath} is tracked, attempting GitHub sync...")
+            sync_result = _sync_to_github(filepath)
+            if sync_result:
+                logging.info(f"GitHub sync successful for {filepath}")
+            else:
+                logging.warning(f"GitHub sync failed for {filepath} - check logs for details")
+        else:
+            logging.debug(f"File {filepath} is not tracked for GitHub sync")
         
         return True
     except Exception as e:
@@ -92,11 +102,14 @@ def _sync_to_github(filepath):
                 github_token = st.secrets.github.get("GITHUB_TOKEN")
                 repo_owner = st.secrets.github.get("GITHUB_REPO_OWNER")
                 repo_name = st.secrets.github.get("GITHUB_REPO_NAME")
+                logging.info("Found GitHub secrets in [github] section")
             else:
                 github_token = st.secrets.get("GITHUB_TOKEN")
                 repo_owner = st.secrets.get("GITHUB_REPO_OWNER")
                 repo_name = st.secrets.get("GITHUB_REPO_NAME")
-        except (AttributeError, KeyError):
+                logging.info("Found GitHub secrets in root section")
+        except (AttributeError, KeyError) as e:
+            logging.warning(f"Error accessing secrets: {str(e)}")
             pass
         
         # Fallback to environment variables
@@ -109,7 +122,10 @@ def _sync_to_github(filepath):
         
         if not github_token:
             logging.warning("GITHUB_TOKEN not found in secrets or environment. Skipping GitHub sync.")
+            logging.warning("Make sure GITHUB_TOKEN is set in Streamlit Cloud secrets under [github] section")
             return False
+        
+        logging.info(f"GitHub token found. Repo: {repo_owner}/{repo_name if repo_name else 'auto-detect'}")
         
         # Find repository root by walking up from filepath
         repo_path = filepath.parent
@@ -243,9 +259,12 @@ def _sync_to_github(filepath):
             
             if result.returncode == 0:
                 logging.info(f"Successfully synced {relative_path} to GitHub")
+                logging.info(f"Push output: {result.stdout}")
                 return True
             else:
-                logging.warning(f"Git push failed: {result.stderr}")
+                logging.error(f"Git push failed with return code {result.returncode}")
+                logging.error(f"Push stderr: {result.stderr}")
+                logging.error(f"Push stdout: {result.stdout}")
                 return False
                 
         except subprocess.TimeoutExpired:
