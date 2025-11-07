@@ -293,10 +293,7 @@ elif page == "Company Management":
                 else:
                     st.error("⚠️ Company name is required")
         
-        # Trigger rerun after successful creation to show success message
-        if st.session_state.get('company_created', False) and st.session_state.get('company_form_cleared', False):
-            st.session_state.company_form_cleared = False
-            st.rerun()
+        # Success message is shown in the form above
     
     with tab3:
         st.subheader("⚙️ Manage Existing Company")
@@ -354,7 +351,6 @@ elif page == "Company Management":
                                     success, message = enable_disable_company(selected_company_id, False)
                                     if success:
                                         st.success(message)
-                                        st.rerun()
                                     else:
                                         st.error(message)
                             else:
@@ -362,7 +358,6 @@ elif page == "Company Management":
                                     success, message = enable_disable_company(selected_company_id, True)
                                     if success:
                                         st.success(message)
-                                        st.rerun()
                                     else:
                                         st.error(message)
                         
@@ -402,7 +397,6 @@ elif page == "Company Management":
                                     if success:
                                         st.success(message)
                                         st.session_state[sub_key] = new_sub_type
-                                        st.rerun()
                                     else:
                                         st.error(message)
                         
@@ -418,7 +412,6 @@ elif page == "Company Management":
                                 if st.session_state.get('confirm_delete_company') != selected_company_id:
                                     # First click - set confirmation
                                     st.session_state.confirm_delete_company = selected_company_id
-                                    st.rerun()
                                 else:
                                     # Second click - actually delete
                                     success, message = delete_company(selected_company_id)
@@ -426,7 +419,6 @@ elif page == "Company Management":
                                         # Clear confirmation state
                                         st.session_state.confirm_delete_company = None
                                         st.success(message)
-                                        st.rerun()
                                     else:
                                         st.error(message)
                                         # Clear confirmation on error too
@@ -532,10 +524,7 @@ elif page == "User Management":
                 else:
                     st.error("⚠️ Username and password are required")
         
-        # Trigger rerun after successful creation to show success message
-        if st.session_state.get('user_created', False) and st.session_state.get('user_form_cleared', False):
-            st.session_state.user_form_cleared = False
-            st.rerun()
+        # Success message is shown in the form above
     
     with tab3:
         st.subheader("⚙️ Manage Existing User")
@@ -573,7 +562,6 @@ elif page == "User Management":
                                     success, message = enable_disable_user(selected_username, False)
                                     if success:
                                         st.success(message)
-                                        st.rerun()
                                     else:
                                         st.error(message)
                             else:
@@ -581,7 +569,6 @@ elif page == "User Management":
                                     success, message = enable_disable_user(selected_username, True)
                                     if success:
                                         st.success(message)
-                                        st.rerun()
                                     else:
                                         st.error(message)
                         
@@ -601,7 +588,6 @@ elif page == "User Management":
                                     if success:
                                         st.success(message)
                                         st.session_state[tier_key] = new_tier
-                                        st.rerun()
                                     else:
                                         st.error(message)
                         
@@ -621,7 +607,6 @@ elif page == "User Management":
                                     if success:
                                         st.success(message)
                                         st.session_state[role_key] = new_role
-                                        st.rerun()
                                     else:
                                         st.error(message)
                         
@@ -651,21 +636,19 @@ elif page == "User Management":
                                     if success:
                                         st.success(message)
                                         st.session_state[company_key] = new_company_idx
-                                        st.rerun()
                                     else:
                                         st.error(message)
                         
                         with col5:
                             st.subheader("Reset Password")
                             # Use a form to handle password reset properly
-                            with st.form(f"reset_pwd_form_{selected_username}"):
+                            with st.form(f"reset_pwd_form_{selected_username}", clear_on_submit=True):
                                 new_password = st.text_input("New Password", type="password", key=f"reset_pwd_{selected_username}")
                                 if st.form_submit_button("Update Password", use_container_width=True):
                                     if new_password:
                                         success, message = update_user_password(selected_username, new_password)
                                         if success:
                                             st.success(message)
-                                            st.rerun()  # Rerun to clear the form
                                         else:
                                             st.error(message)
                                     else:
@@ -684,7 +667,6 @@ elif page == "User Management":
                                     if success:
                                         st.success(message)
                                         st.session_state.confirm_delete = None
-                                        st.rerun()
                                     else:
                                         st.error(message)
             else:
@@ -739,7 +721,6 @@ elif page == "Post Management":
                         try:
                             delete_post(selected_post.get('id'))
                             st.success("Post deleted successfully")
-                            st.rerun()
                         except Exception as e:
                             st.error(f"Error deleting post: {str(e)}")
             else:
