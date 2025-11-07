@@ -231,10 +231,32 @@ with st.sidebar:
         
         if os.path.exists(logo_path) and os.path.isfile(logo_path):
             try:
-                st.image(logo_path, use_container_width=True)
+                # Try loading with PIL first to validate the image
+                from PIL import Image
+                img = Image.open(logo_path)
+                st.image(img, use_container_width=True)
+            except ImportError:
+                # If PIL not available, try direct path
+                try:
+                    st.image(logo_path, use_container_width=True)
+                except Exception:
+                    # If that fails, try using base64 encoding
+                    try:
+                        import base64
+                        with open(logo_path, "rb") as f:
+                            img_data = base64.b64encode(f.read()).decode()
+                            st.markdown(f'<img src="data:image/png;base64,{img_data}" style="max-width: 100%; height: auto;" />', unsafe_allow_html=True)
+                    except Exception:
+                        st.markdown("<div style='height: 100px; background: #f0f0f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999;'>LIPG Logo</div>", unsafe_allow_html=True)
             except Exception as img_error:
-                # If image fails to load, show placeholder
-                st.markdown("<div style='height: 100px; background: #f0f0f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999;'>LIPG Logo (Error loading)</div>", unsafe_allow_html=True)
+                # If image fails to load, try base64 encoding as fallback
+                try:
+                    import base64
+                    with open(logo_path, "rb") as f:
+                        img_data = base64.b64encode(f.read()).decode()
+                        st.markdown(f'<img src="data:image/png;base64,{img_data}" style="max-width: 100%; height: auto;" />', unsafe_allow_html=True)
+                except Exception:
+                    st.markdown("<div style='height: 100px; background: #f0f0f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999;'>LIPG Logo</div>", unsafe_allow_html=True)
         else:
             # Logo file not found
             st.markdown("<div style='height: 100px; background: #f0f0f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999;'>LIPG Logo</div>", unsafe_allow_html=True)
