@@ -551,23 +551,10 @@ elif page == "User Management":
                         st.write(f"**Email:** {user_info.get('email', 'N/A')}")
                         st.write(f"**Tier:** {user_info.get('tier', 'Basic')}")
                         company_id = user_info.get('company_id')
-                        company = None
                         if company_id:
                             company = get_company(company_id)
                             company_name = company.get('name', 'Unknown') if company else 'Unknown'
                             st.write(f"**Company:** {company_id} - {company_name}")
-                            if company:
-                                exp_date = company.get('expiration_date', 'N/A')
-                                if exp_date != 'N/A':
-                                    try:
-                                        if 'T' in exp_date:
-                                            exp_date_display = datetime.fromisoformat(exp_date.split('T')[0]).strftime('%Y-%m-%d')
-                                        else:
-                                            exp_date_display = datetime.fromisoformat(exp_date).strftime('%Y-%m-%d')
-                                        status = '✅ Active' if is_subscription_active(company_id) else '❌ Expired'
-                                        st.write(f"**Company Subscription:** {status} (Expires: {exp_date_display})")
-                                    except:
-                                        st.write(f"**Company Subscription:** Expires: {exp_date}")
                         else:
                             st.write(f"**Company:** No company assigned")
                         st.write(f"**Role:** {user_info.get('role', 'User')}")
@@ -670,18 +657,19 @@ elif page == "User Management":
                         
                         with col5:
                             st.subheader("Reset Password")
-                            new_password = st.text_input("New Password", type="password", key=f"reset_pwd_{selected_username}")
-                            if st.button("Update Password", key=f"pwd_btn_{selected_username}"):
-                                if new_password:
-                                    success, message = update_user_password(selected_username, new_password)
-                                    if success:
-                                        st.success(message)
-                                        # Clear password field
-                                        st.session_state[f"reset_pwd_{selected_username}"] = ""
+                            # Use a form to handle password reset properly
+                            with st.form(f"reset_pwd_form_{selected_username}"):
+                                new_password = st.text_input("New Password", type="password", key=f"reset_pwd_{selected_username}")
+                                if st.form_submit_button("Update Password", use_container_width=True):
+                                    if new_password:
+                                        success, message = update_user_password(selected_username, new_password)
+                                        if success:
+                                            st.success(message)
+                                            st.rerun()  # Rerun to clear the form
+                                        else:
+                                            st.error(message)
                                     else:
-                                        st.error(message)
-                                else:
-                                    st.error("Please enter a new password")
+                                        st.error("Please enter a new password")
                         
                         st.divider()
                         col_delete = st.columns(1)[0]
