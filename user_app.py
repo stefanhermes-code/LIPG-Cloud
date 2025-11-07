@@ -221,12 +221,25 @@ with st.sidebar:
     # Logo space at top
     st.markdown("<div style='text-align: center; padding: 20px 0;'>", unsafe_allow_html=True)
     try:
-        logo_path = os.path.join(os.path.dirname(__file__), "static", "logo.png")
-        if os.path.exists(logo_path):
-            st.image(logo_path, use_container_width=True)
+        # Get the absolute path to the logo file
+        current_file = os.path.abspath(__file__)
+        base_dir = os.path.dirname(current_file)
+        logo_path = os.path.join(base_dir, "static", "logo.png")
+        
+        # Normalize the path (handles any path issues)
+        logo_path = os.path.normpath(logo_path)
+        
+        if os.path.exists(logo_path) and os.path.isfile(logo_path):
+            try:
+                st.image(logo_path, use_container_width=True)
+            except Exception as img_error:
+                # If image fails to load, show placeholder
+                st.markdown("<div style='height: 100px; background: #f0f0f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999;'>LIPG Logo (Error loading)</div>", unsafe_allow_html=True)
         else:
+            # Logo file not found
             st.markdown("<div style='height: 100px; background: #f0f0f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999;'>LIPG Logo</div>", unsafe_allow_html=True)
-    except Exception:
+    except Exception as e:
+        # Show placeholder if logo can't be loaded
         st.markdown("<div style='height: 100px; background: #f0f0f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999;'>LIPG Logo</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
     
