@@ -11,12 +11,32 @@ import re
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
-# Initialize OpenAI client
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY environment variable is not set")
+# Lazy client initialization to avoid errors at import time
+_client = None
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+def get_openai_client():
+    """Get or create OpenAI client, checking both environment variables and Streamlit secrets"""
+    global _client
+    if _client is not None:
+        return _client
+    
+    # Try to get API key from environment variable first
+    api_key = os.getenv('OPENAI_API_KEY')
+    
+    # If not found, try Streamlit secrets (for Streamlit Cloud)
+    if not api_key:
+        try:
+            import streamlit as st
+            if hasattr(st, 'secrets') and 'OPENAI_API_KEY' in st.secrets:
+                api_key = st.secrets['OPENAI_API_KEY']
+        except (ImportError, AttributeError):
+            pass
+    
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY not found in environment variables or Streamlit secrets")
+    
+    _client = OpenAI(api_key=api_key)
+    return _client
 
 # Input validation functions
 def validate_input(text, field_name, max_length=500):
@@ -183,6 +203,7 @@ def generate_ai_post(topic, purpose, audience, message, tone_intensity, language
         IMPORTANT: Keep the post within the specified character range. LinkedIn has a 3,000 character limit.
         """
         
+        client = get_openai_client()
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
