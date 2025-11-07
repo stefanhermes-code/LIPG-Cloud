@@ -17,12 +17,13 @@ logging.basicConfig(level=logging.INFO)
 _base_dir = Path(__file__).parent.parent  # Go up from shared_utils to LIPG Cloud
 DATA_DIR = _base_dir / "data"
 POSTS_FILE = DATA_DIR / "posts.json"
-USERS_FILE = DATA_DIR / "users.json"
-AUTH_FILE = DATA_DIR / "auth.json"  # User authentication data
+USERS_FILE = DATA_DIR / "users.json"  # Legacy file - will be migrated to auth.json
+AUTH_FILE = DATA_DIR / "auth.json"  # User data (authentication + stats) - single source of truth
 COMPANIES_FILE = DATA_DIR / "companies.json"  # Company data with subscriptions
 
 # Ensure data directory exists
 DATA_DIR.mkdir(exist_ok=True)
+
 
 def _load_json_file(filepath):
     """Load JSON data from file"""
@@ -86,25 +87,19 @@ def save_post_to_database(user_id, topic, purpose, audience, message, tone_inten
         posts.append(post_data)
         _save_json_file(POSTS_FILE, posts)
         
-        # Update user stats
-        users = _load_json_file(USERS_FILE)
+        # Update user stats in auth.json (post_count and last_post_date)
+        auth_data = _load_json_file(AUTH_FILE)
         user_found = False
-        for user in users:
-            if user.get('user_id') == user_id:
+        for user in auth_data:
+            if user.get('username') == user_id:  # user_id is the username
                 user['post_count'] = user.get('post_count', 0) + 1
                 user['last_post_date'] = datetime.now().isoformat()
                 user_found = True
                 break
         
-        if not user_found:
-            users.append({
-                "user_id": user_id,
-                "post_count": 1,
-                "created_date": datetime.now().isoformat(),
-                "last_post_date": datetime.now().isoformat()
-            })
-        
-        _save_json_file(USERS_FILE, users)
+        # Note: If user doesn't exist in auth.json, that's okay - they'll be created when they log in
+        if user_found:
+            _save_json_file(AUTH_FILE, auth_data)
         
         return True
     except Exception as e:
@@ -141,26 +136,29 @@ def get_all_posts(limit=None):
         return []
 
 def get_all_users():
-    """Get all users with their stats"""
+    """Get all users with their stats (from auth.json)"""
     try:
-        users = _load_json_file(USERS_FILE)
+        auth_data = _load_json_file(AUTH_FILE)
         posts = _load_json_file(POSTS_FILE)
         
-        # Calculate post counts
-        for user in users:
-            user_id = user.get('user_id')
-            user['post_count'] = len([p for p in posts if p.get('user_id') == user_id])
+        # Calculate post counts for each user
+        for user in auth_data:
+            username = user.get('username')
+            if username:
+                user['post_count'] = len([p for p in posts if p.get('user_id') == username])
+                # Also add user_id field for backward compatibility
+                user['user_id'] = username
         
-        return users
+        return auth_data
     except Exception as e:
         logging.error(f"Error getting all users: {str(e)}")
         return []
 
 def get_user_stats(user_id=None):
-    """Get statistics for a user or overall"""
+    """Get statistics for a user or overall (from auth.json)"""
     try:
         posts = _load_json_file(POSTS_FILE)
-        users = _load_json_file(USERS_FILE)
+        auth_data = _load_json_file(AUTH_FILE)
         
         if user_id:
             # User-specific stats
@@ -179,7 +177,7 @@ def get_user_stats(user_id=None):
             week_ago = today - timedelta(days=7)
             
             return {
-                'total_users': len(users),
+                'total_users': len(auth_data),
                 'total_posts': len(posts),
                 'posts_today': len([p for p in posts if datetime.fromisoformat(p.get('date', '2000-01-01')).date() == today]),
                 'posts_week': len([p for p in posts if datetime.fromisoformat(p.get('date', '2000-01-01')).date() >= week_ago]),
@@ -326,7 +324,9 @@ def create_user(username, password, enabled=True, email="", tier="Basic", compan
             "company_id": company_id,
             "role": role,
             "created_date": datetime.now().isoformat(),
-            "last_login": None
+            "last_login": None,
+            "post_count": 0,  # Initialize post count
+            "last_post_date": None
         }
         
         auth_data.append(new_user)
@@ -379,11 +379,14 @@ def get_all_auth_users():
     """Get all authenticated users (without passwords)"""
     try:
         auth_data = _load_json_file(AUTH_FILE)
+        posts = _load_json_file(POSTS_FILE)
+        
         # Remove passwords from response and ensure defaults exist (backward compatibility)
         users = []
         for user in auth_data:
             user_info = user.copy()
             user_info.pop('password', None)
+            
             # Set defaults if not present (for backward compatibility)
             if 'tier' not in user_info:
                 user_info['tier'] = 'Basic'
@@ -391,6 +394,12 @@ def get_all_auth_users():
                 user_info['company_id'] = None
             if 'role' not in user_info:
                 user_info['role'] = 'User'
+            
+            # Calculate post_count if not present
+            username = user_info.get('username')
+            if username and 'post_count' not in user_info:
+                user_info['post_count'] = len([p for p in posts if p.get('user_id') == username])
+            
             users.append(user_info)
         return users
     except Exception as e:
