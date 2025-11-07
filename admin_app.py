@@ -249,6 +249,15 @@ elif page == "Company Management":
     with tab2:
         st.subheader("➕ Add New Company")
         
+        # Clear any previous success messages when entering this tab
+        if 'company_created' in st.session_state:
+            if st.session_state.company_created:
+                # Show success message once, then clear
+                company_id = st.session_state.get('company_created_id', '')
+                st.success(f"✅ Company created successfully! Company ID: {company_id}")
+                st.session_state.company_created = False
+                st.session_state.company_created_id = ""
+        
         with st.form("add_company_form"):
             company_name = st.text_input("Company Name *", help="Name of the company", value="")
             subscription_type = st.selectbox("Subscription Type *", ["monthly", "annual"], index=0)
@@ -278,13 +287,6 @@ elif page == "Company Management":
                         st.error(f"❌ Error: {company_id}")
                 else:
                     st.error("⚠️ Company name is required")
-        
-        # Show success message after rerun (outside form)
-        if st.session_state.get('company_created', False):
-            company_id = st.session_state.get('company_created_id', '')
-            st.success(f"✅ Company created successfully! Company ID: {company_id}")
-            st.session_state.company_created = False
-            st.session_state.company_created_id = ""
     
     with tab3:
         st.subheader("⚙️ Manage Existing Company")
@@ -455,9 +457,14 @@ elif page == "User Management":
     with tab2:
         st.subheader("➕ Add New User")
         
-        # Initialize form state
-        if 'user_form_submitted' not in st.session_state:
-            st.session_state.user_form_submitted = False
+        # Clear any previous success messages when entering this tab
+        if 'user_created' in st.session_state:
+            if st.session_state.user_created:
+                # Show success message once, then clear
+                message = st.session_state.get('user_created_message', 'User created successfully!')
+                st.success(f"✅ {message}")
+                st.session_state.user_created = False
+                st.session_state.user_created_message = ""
         
         with st.form("add_user_form"):
             new_username = st.text_input("Username *", help="Unique username for the user", value="")
@@ -490,12 +497,6 @@ elif page == "User Management":
                         st.error(f"❌ {message}")
                 else:
                     st.error("⚠️ Username and password are required")
-        
-        # Show success message after rerun (outside form)
-        if st.session_state.get('user_created', False):
-            st.success(f"✅ {st.session_state.get('user_created_message', 'User created successfully!')}")
-            st.session_state.user_created = False
-            st.session_state.user_created_message = ""
     
     with tab3:
         st.subheader("⚙️ Manage Existing User")
