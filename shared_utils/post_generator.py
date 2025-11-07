@@ -35,7 +35,12 @@ def get_openai_client():
     if not api_key:
         raise ValueError("OPENAI_API_KEY not found in environment variables or Streamlit secrets")
     
-    _client = OpenAI(api_key=api_key)
+    # Create client with explicit retry and timeout limits to prevent excessive retries
+    _client = OpenAI(
+        api_key=api_key,
+        max_retries=2,  # Limit retries to prevent excessive API calls
+        timeout=60.0  # 60 second timeout to prevent hanging
+    )
     return _client
 
 # Input validation functions
@@ -210,7 +215,6 @@ def generate_ai_post(topic, purpose, audience, message, tone_intensity, language
                 {"role": "system", "content": template['system_prompt']},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=1000,
             temperature=0.7
         )
         
