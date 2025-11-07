@@ -6,6 +6,7 @@ Handles database operations for posts and users
 import json
 import csv
 import os
+import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 import logging
@@ -59,9 +60,203 @@ def _save_json_file(filepath, data):
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
         logging.info(f"Successfully saved {filepath}")
+        
+        # Sync to GitHub if token is available and file should be tracked
+        tracked_files = [AUTH_FILE, COMPANIES_FILE]  # Only sync tracked files
+        if filepath in tracked_files:
+            _sync_to_github(filepath)
+        
         return True
     except Exception as e:
         logging.error(f"Error saving {filepath}: {str(e)}")
+        return False
+
+def _sync_to_github(filepath):
+    """Sync file changes to GitHub using git commands"""
+    try:
+        import streamlit as st
+    except ImportError:
+        # Streamlit not available (e.g., during testing)
+        logging.warning("Streamlit not available. Skipping GitHub sync.")
+        return False
+    
+    try:
+        # Get GitHub configuration from Streamlit secrets
+        github_token = None
+        repo_owner = None
+        repo_name = None
+        
+        try:
+            # Try to get from secrets (can be in [github] section or root)
+            if hasattr(st.secrets, 'github'):
+                github_token = st.secrets.github.get("GITHUB_TOKEN")
+                repo_owner = st.secrets.github.get("GITHUB_REPO_OWNER")
+                repo_name = st.secrets.github.get("GITHUB_REPO_NAME")
+            else:
+                github_token = st.secrets.get("GITHUB_TOKEN")
+                repo_owner = st.secrets.get("GITHUB_REPO_OWNER")
+                repo_name = st.secrets.get("GITHUB_REPO_NAME")
+        except (AttributeError, KeyError):
+            pass
+        
+        # Fallback to environment variables
+        if not github_token:
+            github_token = os.environ.get("GITHUB_TOKEN")
+        if not repo_owner:
+            repo_owner = os.environ.get("GITHUB_REPO_OWNER")
+        if not repo_name:
+            repo_name = os.environ.get("GITHUB_REPO_NAME")
+        
+        if not github_token:
+            logging.warning("GITHUB_TOKEN not found in secrets or environment. Skipping GitHub sync.")
+            return False
+        
+        # Find repository root by walking up from filepath
+        repo_path = filepath.parent
+        while repo_path != repo_path.parent:
+            if (repo_path / ".git").exists():
+                break
+            repo_path = repo_path.parent
+        else:
+            logging.warning("Not in a git repository. Skipping GitHub sync.")
+            return False
+        
+        # Build authenticated URL - use explicit repo info if provided, otherwise detect from git
+        if repo_owner and repo_name:
+            # Use explicit repository information from secrets
+            authenticated_url = f"https://{github_token}@github.com/{repo_owner}/{repo_name}.git"
+            logging.info(f"Using explicit repo: {repo_owner}/{repo_name}")
+        else:
+            # Fallback: Get remote URL from git config
+            try:
+                result = subprocess.run(
+                    ["git", "config", "--get", "remote.origin.url"],
+                    cwd=repo_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                remote_url = result.stdout.strip()
+                if not remote_url:
+                    logging.warning("No remote origin URL found and no explicit repo info. Skipping GitHub sync.")
+                    return False
+                
+                # Replace HTTPS URL with token-authenticated URL
+                if remote_url.startswith("https://"):
+                    # Extract repo path (e.g., github.com/username/repo.git)
+                    repo_path_str = remote_url.replace("https://", "").replace(".git", "")
+                    if "@" not in repo_path_str:  # Not already authenticated
+                        authenticated_url = f"https://{github_token}@{repo_path_str}.git"
+                    else:
+                        authenticated_url = remote_url
+                else:
+                    authenticated_url = remote_url
+                    
+            except Exception as e:
+                logging.error(f"Error getting git remote URL: {str(e)}")
+                return False
+        
+        # Configure git user (required for commits)
+        try:
+            subprocess.run(
+                ["git", "config", "user.name", "Streamlit Cloud"],
+                cwd=repo_path,
+                capture_output=True,
+                timeout=5
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "streamlit@cloud.app"],
+                cwd=repo_path,
+                capture_output=True,
+                timeout=5
+            )
+        except Exception as e:
+            logging.warning(f"Error configuring git user: {str(e)}")
+        
+        # Get relative path from repo root
+        try:
+            relative_path = filepath.relative_to(repo_path)
+        except ValueError:
+            # File is outside repo, skip
+            logging.warning(f"File {filepath} is outside repository. Skipping GitHub sync.")
+            return False
+        
+        # Stage the file
+        try:
+            subprocess.run(
+                ["git", "add", str(relative_path)],
+                cwd=repo_path,
+                capture_output=True,
+                timeout=10,
+                check=True
+            )
+        except subprocess.CalledProcessError as e:
+            logging.warning(f"Error staging file: {str(e)}")
+            return False
+        
+        # Commit the changes
+        commit_message = f"Update {relative_path.name} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        try:
+            subprocess.run(
+                ["git", "commit", "-m", commit_message],
+                cwd=repo_path,
+                capture_output=True,
+                timeout=10,
+                check=False  # Don't fail if nothing to commit
+            )
+        except subprocess.TimeoutExpired:
+            logging.warning("Git commit timed out")
+            return False
+        except Exception as e:
+            logging.warning(f"Error committing changes: {str(e)}")
+            # Continue anyway - might be no changes to commit
+        
+        # Push to GitHub
+        try:
+            # Set remote URL with token
+            subprocess.run(
+                ["git", "remote", "set-url", "origin", authenticated_url],
+                cwd=repo_path,
+                capture_output=True,
+                timeout=5,
+                check=True
+            )
+            
+            # Get current branch name
+            branch_result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            current_branch = branch_result.stdout.strip() if branch_result.returncode == 0 else "main"
+            
+            # Push to current branch
+            result = subprocess.run(
+                ["git", "push", "origin", current_branch],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                logging.info(f"Successfully synced {relative_path} to GitHub")
+                return True
+            else:
+                logging.warning(f"Git push failed: {result.stderr}")
+                return False
+                
+        except subprocess.TimeoutExpired:
+            logging.warning("Git push timed out")
+            return False
+        except Exception as e:
+            logging.error(f"Error pushing to GitHub: {str(e)}")
+            return False
+            
+    except Exception as e:
+        logging.error(f"Error syncing to GitHub: {str(e)}")
         return False
 
 def save_post_to_database(user_id, topic, purpose, audience, message, tone_intensity, 
