@@ -1,0 +1,21 @@
+[
+  {
+    "id": 1,
+    "name": "HTC Global",
+    "subscription_type": "annual",
+    "start_date": "2025-01-01T00:00:00",
+    "expiration_date": "2025-12-31T23:59:59",
+    "created_date": "2025-01-01T00:00:00",
+    "enabled": true
+  },
+  {
+    "id": 2,
+    "name": "FDF Management",
+    "subscription_type": "annual",
+    "start_date": "2025-01-01T00:00:00",
+    "expiration_date": "2025-12-31T23:59:59",
+    "created_date": "2025-01-01T00:00:00",
+    "enabled": true
+  }
+]
+
