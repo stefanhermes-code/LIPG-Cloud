@@ -863,17 +863,17 @@ if st.session_state.get('show_history', False):
                 if filtered_history:
                     for idx, post_data in enumerate(filtered_history[:20]):  # Show up to 20 filtered posts
                         with st.expander(f"Post #{idx+1} - {post_data.get('topic', 'N/A')} ({post_data.get('date', 'N/A')})"):
-                        st.write(f"**Topic:** {post_data.get('topic', 'N/A')}")
-                        st.write(f"**Purpose:** {post_data.get('purpose', 'N/A')}")
-                        st.write(f"**Generated Post:**")
-                        
-                        post_text_history = post_data.get('generated_post', 'N/A')
-                        st.text(post_text_history)
-                        
-                        # Download HTML button for this post
-                        if post_text_history != 'N/A':
-                            escaped_post_text = html.escape(post_text_history)
-                            html_content = f"""<!DOCTYPE html>
+                            st.write(f"**Topic:** {post_data.get('topic', 'N/A')}")
+                            st.write(f"**Purpose:** {post_data.get('purpose', 'N/A')}")
+                            st.write(f"**Generated Post:**")
+                            
+                            post_text_history = post_data.get('generated_post', 'N/A')
+                            st.text(post_text_history)
+                            
+                            # Download HTML button for this post
+                            if post_text_history != 'N/A':
+                                escaped_post_text = html.escape(post_text_history)
+                                html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -940,10 +940,10 @@ if st.session_state.get('show_history', False):
 </body>
 </html>"""
                             
-                            b64_html = base64.b64encode(html_content.encode('utf-8')).decode()
-                            filename = f"linkedin_post_{post_data.get('date', 'N/A').replace('/', '_').replace(' ', '_')}.html"
-                            href = f'<a href="data:text/html;charset=utf-8;base64,{b64_html}" download="{filename}" style="text-decoration: none; color: white; background-color: #0077b5; padding: 8px 16px; border-radius: 5px; display: inline-block; font-weight: 500; margin-top: 10px;">📥 Download HTML</a>'
-                            st.markdown(href, unsafe_allow_html=True)
+                                b64_html = base64.b64encode(html_content.encode('utf-8')).decode()
+                                filename = f"linkedin_post_{post_data.get('date', 'N/A').replace('/', '_').replace(' ', '_')}.html"
+                                href = f'<a href="data:text/html;charset=utf-8;base64,{b64_html}" download="{filename}" style="text-decoration: none; color: white; background-color: #0077b5; padding: 8px 16px; border-radius: 5px; display: inline-block; font-weight: 500; margin-top: 10px;">📥 Download HTML</a>'
+                                st.markdown(href, unsafe_allow_html=True)
                 else:
                     st.warning("No posts match your search criteria. Try adjusting your filters.")
             else:
