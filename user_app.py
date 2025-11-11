@@ -6,7 +6,7 @@ Streamlit-based cloud application for generating LinkedIn posts
 import streamlit as st
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import hashlib
 import base64
@@ -52,6 +52,12 @@ if 'form_reset' not in st.session_state:
     st.session_state.form_reset = False
 if 'reset_key' not in st.session_state:
     st.session_state.reset_key = '0'
+if 'edit_mode' not in st.session_state:
+    st.session_state.edit_mode = False
+if 'edited_post' not in st.session_state:
+    st.session_state.edited_post = ""
+if 'last_form_values' not in st.session_state:
+    st.session_state.last_form_values = {}
 
 # Load customer configuration
 try:
@@ -476,10 +482,25 @@ if generate_button and not st.session_state.generating:
                         st.session_state.generating = False
                     else:
                         st.session_state.generated_post = post
+                        st.session_state.edited_post = post  # Initialize edited_post
                         st.session_state.visual_prompt = visual_prompt
                         st.session_state.generating = False
                         
-                        # Save to database
+                        # Store form values for later saving
+                        st.session_state.last_form_values = {
+                            'topic': topic,
+                            'purpose': purpose,
+                            'audience': audience,
+                            'message': message,
+                            'tone_intensity': tone_intensity,
+                            'language_style': language_style,
+                            'post_length': post_length,
+                            'formatting': formatting,
+                            'cta': cta,
+                            'post_goal': post_goal
+                        }
+                        
+                        # Save to database immediately
                         if st.session_state.username:
                             save_post_to_database(
                                 user_id=st.session_state.username,
@@ -509,20 +530,106 @@ if st.session_state.generated_post:
     
     post_container = st.container()
     with post_container:
-        # Display post with proper line breaks preserved
-        post_text = st.session_state.generated_post
+        # Determine which post text to use (edited or original)
+        if st.session_state.edit_mode and st.session_state.edited_post:
+            post_text = st.session_state.edited_post
+        else:
+            post_text = st.session_state.generated_post
+            # Initialize edited_post if not set
+            if not st.session_state.edited_post:
+                st.session_state.edited_post = post_text
         
-        # Display the post with proper formatting (preserves line breaks)
-        st.markdown(f"""
-            <div class="post-container" style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin: 20px 0;">
-                <h3 style="color: #0077b5; margin-bottom: 15px;">Your LinkedIn Post:</h3>
-                <div style="white-space: pre-wrap; font-size: 16px; line-height: 1.8; color: #333; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">{html.escape(post_text)}</div>
-            </div>
-        """, unsafe_allow_html=True)
+        # Edit mode toggle
+        col_edit_toggle, col_char_count = st.columns([3, 1])
+        with col_edit_toggle:
+            edit_mode = st.checkbox("✏️ Edit Post", value=st.session_state.edit_mode, key="edit_mode_checkbox")
+            if edit_mode != st.session_state.edit_mode:
+                st.session_state.edit_mode = edit_mode
+                if edit_mode:
+                    st.session_state.edited_post = st.session_state.generated_post
+                st.rerun()
+        
+        with col_char_count:
+            char_count = len(post_text)
+            char_limit = 3000
+            char_remaining = char_limit - char_count
+            if char_remaining < 0:
+                st.error(f"⚠️ {abs(char_remaining)} over limit")
+            elif char_remaining < 100:
+                st.warning(f"⚠️ {char_remaining} remaining")
+            else:
+                st.info(f"📊 {char_count}/{char_limit} chars")
+        
+        if st.session_state.edit_mode:
+            # Editable text area
+            edited_text = st.text_area(
+                "Edit your post:",
+                value=post_text,
+                height=300,
+                key="edit_post_textarea",
+                help="Make any changes you want to the generated post. Character limit: 3,000"
+            )
+            
+            # Update edited_post when user types
+            if edited_text != st.session_state.edited_post:
+                st.session_state.edited_post = edited_text
+                post_text = edited_text
+            
+            # Save/Cancel buttons
+            col_save, col_cancel, col_reset = st.columns([1, 1, 2])
+            with col_save:
+                if st.button("💾 Save Changes", type="primary", use_container_width=True):
+                    st.session_state.generated_post = st.session_state.edited_post
+                    st.session_state.edit_mode = False
+                    st.success("✅ Post updated!")
+                    st.rerun()
+            with col_cancel:
+                if st.button("❌ Cancel", use_container_width=True):
+                    st.session_state.edited_post = st.session_state.generated_post
+                    st.session_state.edit_mode = False
+                    st.rerun()
+            with col_reset:
+                if st.button("🔄 Reset to Original", use_container_width=True):
+                    st.session_state.edited_post = st.session_state.generated_post
+                    st.rerun()
+        else:
+            # Display the post with proper formatting (preserves line breaks)
+            st.markdown(f"""
+                <div class="post-container" style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin: 20px 0;">
+                    <h3 style="color: #0077b5; margin-bottom: 15px;">Your LinkedIn Post:</h3>
+                    <div style="white-space: pre-wrap; font-size: 16px; line-height: 1.8; color: #333; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">{html.escape(post_text)}</div>
+                </div>
+            """, unsafe_allow_html=True)
         
         # Action buttons
         st.markdown("<br>", unsafe_allow_html=True)
-        col_copy1, col_copy2, col_copy3, col_copy4 = st.columns([1, 1, 1, 1])
+        col_copy1, col_copy2, col_copy3, col_copy4, col_save = st.columns([1, 1, 1, 1, 1])
+        
+        with col_copy1:
+            # Save to History button (for edited posts)
+            if st.button("💾 Save to History", use_container_width=True, help="Save this post (including edits) to your history"):
+                if st.session_state.username and st.session_state.last_form_values:
+                    # Save the current post (edited or original) with form values
+                    form_vals = st.session_state.last_form_values
+                    save_post_to_database(
+                        user_id=st.session_state.username,
+                        topic=form_vals.get('topic', 'Edited Post'),
+                        purpose=form_vals.get('purpose', ''),
+                        audience=form_vals.get('audience', 'General'),
+                        message=form_vals.get('message', ''),
+                        tone_intensity=form_vals.get('tone_intensity', 'Moderate'),
+                        language_style=form_vals.get('language_style', 'Professional'),
+                        post_length=form_vals.get('post_length', 'Medium'),
+                        formatting=form_vals.get('formatting', 'Paragraphs'),
+                        cta=form_vals.get('cta', ''),
+                        post_goal=form_vals.get('post_goal', 'Inform'),
+                        generated_post=post_text  # Use current post text (edited or original)
+                    )
+                    st.success("✅ Post saved to history!")
+                elif not st.session_state.username:
+                    st.warning("Please log in to save posts to history")
+                else:
+                    st.info("💡 Generate a post first to enable saving to history")
         
         with col_copy2:
             # Copy to clipboard - use a text area that users can easily select and copy
@@ -536,10 +643,33 @@ if st.session_state.generated_post:
             )
         
         with col_copy3:
-            # Download HTML button
-            # Escape HTML entities in post text
-            escaped_post_text = html.escape(post_text)
+            # Export options
+            st.markdown("**Export Options:**")
             
+            # Use current post_text (edited or original)
+            download_post_text = post_text
+            # Escape HTML entities in post text
+            escaped_post_text = html.escape(download_post_text)
+            
+            # Markdown export
+            markdown_content = f"""# LinkedIn Post
+
+**Generated:** {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
+
+---
+
+{download_post_text}
+
+---
+
+*Generated by LinkedIn Post Generator*
+"""
+            b64_md = base64.b64encode(markdown_content.encode('utf-8')).decode()
+            md_filename = f"linkedin_post_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+            md_href = f'<a href="data:text/markdown;charset=utf-8;base64,{b64_md}" download="{md_filename}" style="text-decoration: none; color: white; background-color: #0077b5; padding: 8px 16px; border-radius: 5px; display: inline-block; font-weight: 500; margin: 5px 0; font-size: 14px;">📄 Download Markdown</a>'
+            st.markdown(md_href, unsafe_allow_html=True)
+            
+            # HTML export
             # Create nicely formatted HTML
             html_content = f"""<!DOCTYPE html>
 <html lang="en">
@@ -598,9 +728,23 @@ if st.session_state.generated_post:
             
             # Create download button
             b64_html = base64.b64encode(html_content.encode('utf-8')).decode()
-            filename = f"linkedin_post_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
-            href = f'<a href="data:text/html;charset=utf-8;base64,{b64_html}" download="{filename}" style="text-decoration: none; color: white; background-color: #0077b5; padding: 10px 20px; border-radius: 5px; display: inline-block; font-weight: 500;">📥 Download HTML</a>'
-            st.markdown(href, unsafe_allow_html=True)
+            html_filename = f"linkedin_post_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+            html_href = f'<a href="data:text/html;charset=utf-8;base64,{b64_html}" download="{html_filename}" style="text-decoration: none; color: white; background-color: #0077b5; padding: 8px 16px; border-radius: 5px; display: inline-block; font-weight: 500; margin: 5px 0; font-size: 14px;">📥 Download HTML</a>'
+            st.markdown(html_href, unsafe_allow_html=True)
+            
+            # Plain text export
+            txt_content = f"""LinkedIn Post
+Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
+
+{download_post_text}
+
+---
+Generated by LinkedIn Post Generator
+"""
+            b64_txt = base64.b64encode(txt_content.encode('utf-8')).decode()
+            txt_filename = f"linkedin_post_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            txt_href = f'<a href="data:text/plain;charset=utf-8;base64,{b64_txt}" download="{txt_filename}" style="text-decoration: none; color: white; background-color: #6c757d; padding: 8px 16px; border-radius: 5px; display: inline-block; font-weight: 500; margin: 5px 0; font-size: 14px;">📝 Download TXT</a>'
+            st.markdown(txt_href, unsafe_allow_html=True)
         
         # Visual prompt section
         if st.session_state.visual_prompt:
@@ -618,8 +762,53 @@ if st.session_state.get('show_history', False):
         try:
             history = get_user_post_history(st.session_state.username)
             if history:
-                for idx, post_data in enumerate(history[:10]):  # Show last 10 posts
-                    with st.expander(f"Post #{idx+1} - {post_data.get('topic', 'N/A')} ({post_data.get('date', 'N/A')})"):
+                # Search and filter options
+                col_search, col_filter_goal, col_filter_date = st.columns([2, 1, 1])
+                
+                with col_search:
+                    search_query = st.text_input("🔍 Search posts", placeholder="Search by topic, message, or content...", key="history_search")
+                
+                with col_filter_goal:
+                    all_goals = ["All"] + sorted(list(set([p.get('post_goal', 'Unknown') for p in history])))
+                    filter_goal = st.selectbox("Filter by Goal", all_goals, key="history_filter_goal")
+                
+                with col_filter_date:
+                    date_options = ["All Time", "Last 7 Days", "Last 30 Days", "Last 90 Days"]
+                    filter_date = st.selectbox("Date Range", date_options, key="history_filter_date")
+                
+                # Apply filters
+                filtered_history = history
+                
+                # Search filter
+                if search_query:
+                    search_lower = search_query.lower()
+                    filtered_history = [
+                        p for p in filtered_history
+                        if (search_lower in p.get('topic', '').lower() or
+                            search_lower in p.get('message', '').lower() or
+                            search_lower in p.get('generated_post', '').lower() or
+                            search_lower in p.get('purpose', '').lower())
+                    ]
+                
+                # Goal filter
+                if filter_goal != "All":
+                    filtered_history = [p for p in filtered_history if p.get('post_goal') == filter_goal]
+                
+                # Date filter
+                if filter_date != "All Time":
+                    days = {"Last 7 Days": 7, "Last 30 Days": 30, "Last 90 Days": 90}[filter_date]
+                    cutoff_date = datetime.now() - timedelta(days=days)
+                    filtered_history = [
+                        p for p in filtered_history
+                        if datetime.fromisoformat(p.get('date', '2000-01-01').replace('Z', '+00:00').split('T')[0]) >= cutoff_date
+                    ]
+                
+                # Display results count
+                st.info(f"Showing {len(filtered_history)} of {len(history)} posts")
+                
+                if filtered_history:
+                    for idx, post_data in enumerate(filtered_history[:20]):  # Show up to 20 filtered posts
+                        with st.expander(f"Post #{idx+1} - {post_data.get('topic', 'N/A')} ({post_data.get('date', 'N/A')})"):
                         st.write(f"**Topic:** {post_data.get('topic', 'N/A')}")
                         st.write(f"**Purpose:** {post_data.get('purpose', 'N/A')}")
                         st.write(f"**Generated Post:**")
@@ -701,6 +890,8 @@ if st.session_state.get('show_history', False):
                             filename = f"linkedin_post_{post_data.get('date', 'N/A').replace('/', '_').replace(' ', '_')}.html"
                             href = f'<a href="data:text/html;charset=utf-8;base64,{b64_html}" download="{filename}" style="text-decoration: none; color: white; background-color: #0077b5; padding: 8px 16px; border-radius: 5px; display: inline-block; font-weight: 500; margin-top: 10px;">📥 Download HTML</a>'
                             st.markdown(href, unsafe_allow_html=True)
+                else:
+                    st.warning("No posts match your search criteria. Try adjusting your filters.")
             else:
                 st.info("No post history found.")
         except Exception as e:
