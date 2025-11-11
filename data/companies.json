@@ -6,7 +6,10 @@
     "start_date": "2025-01-01T00:00:00",
     "expiration_date": "2025-12-31T23:59:59",
     "created_date": "2025-01-01T00:00:00",
-    "enabled": true
+    "enabled": true,
+    "logo_path": "static/company_1_logo.png",
+    "background_color": null,
+    "button_color": null
   },
   {
     "id": 2,
@@ -18,4 +21,3 @@
     "enabled": true
   }
 ]
-
