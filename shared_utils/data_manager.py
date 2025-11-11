@@ -860,7 +860,11 @@ def create_company(name, subscription_type="monthly", start_date=None, expiratio
             "start_date": start_date,
             "expiration_date": expiration_date,
             "created_date": datetime.now().isoformat(),
-            "enabled": True
+            "enabled": True,
+            # Branding fields (optional - will use global config if not set)
+            "logo_path": None,
+            "background_color": None,
+            "button_color": None
         }
         
         companies.append(new_company)

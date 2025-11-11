@@ -23,7 +23,8 @@ CONFIG_FILE.parent.mkdir(exist_ok=True)
 DEFAULT_CONFIG = {
     "customer_name": "LinkedIn Post Generator",
     "background_color": "#E9F7EF",
-    "button_color": "#17A2B8"
+    "button_color": "#17A2B8",
+    "logo_path": "static/logo.png"  # Path to customer logo (relative to LIPG Cloud folder)
 }
 
 # Cache for config file
