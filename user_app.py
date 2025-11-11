@@ -75,13 +75,18 @@ except Exception as e:
     button_color = '#17A2B8'
     configured_logo_path = 'static/logo.png'
 
+# Logo logic: Different for login screen vs authenticated users
+_base_dir = os.path.dirname(os.path.abspath(__file__))
+
 # Get company name and branding for logged-in user
 display_company_name = customer_name  # Default to global customer name
-company_logo_path = configured_logo_path  # Default to global logo
+company_logo_path = None  # Will be set based on authentication status
 company_bg_color = background_color  # Default to global background
 company_button_color = button_color  # Default to global button color
 
+# Determine logo path based on authentication status
 if st.session_state.get('authenticated') and st.session_state.get('username'):
+    # AFTER LOGIN: Use company-specific logo or customer logo
     try:
         user_info = get_user(st.session_state.username)
         if user_info and user_info.get('company_id'):
@@ -98,19 +103,26 @@ if st.session_state.get('authenticated') and st.session_state.get('username'):
     except Exception:
         # If error getting company, use default
         pass
-
-# Get logo path - use company logo if available, otherwise customer logo, otherwise default
-_base_dir = os.path.dirname(os.path.abspath(__file__))
-_logo_path = os.path.join(_base_dir, company_logo_path)
-_logo_exists = os.path.exists(_logo_path)
-
-# Fallback chain: company logo -> customer logo -> default logo
-if not _logo_exists:
-    _logo_path = os.path.join(_base_dir, configured_logo_path)
+    
+    # If no company logo, use customer logo, otherwise default
+    if not company_logo_path:
+        company_logo_path = configured_logo_path
+    
+    # Get logo path with fallback chain: company logo -> customer logo -> default LIPG logo
+    _logo_path = os.path.join(_base_dir, company_logo_path)
     _logo_exists = os.path.exists(_logo_path)
-    if not _logo_exists and configured_logo_path != 'static/logo.png':
-        _logo_path = os.path.join(_base_dir, "static", "logo.png")
+    
+    # Fallback chain for authenticated users
+    if not _logo_exists:
+        _logo_path = os.path.join(_base_dir, configured_logo_path)
         _logo_exists = os.path.exists(_logo_path)
+        if not _logo_exists:
+            _logo_path = os.path.join(_base_dir, "static", "logo.png")
+            _logo_exists = os.path.exists(_logo_path)
+else:
+    # BEFORE LOGIN: Always use LIPG logo (static/logo.png)
+    _logo_path = os.path.join(_base_dir, "static", "logo.png")
+    _logo_exists = os.path.exists(_logo_path)
 
 # Custom CSS - use company branding if available, otherwise global
 st.markdown(f"""

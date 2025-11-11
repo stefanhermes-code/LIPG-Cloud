@@ -335,92 +335,109 @@ elif page == "Company Management":
                         st.subheader("Company Branding")
                         st.write("💡 Company-specific branding will override global branding for users in this company.")
                         
-                        # Logo upload section
-                        st.write("**Company Logo:**")
-                        col_upload, col_preview = st.columns([2, 1])
-                        
-                        with col_upload:
-                            uploaded_logo = st.file_uploader(
-                                "Upload Company Logo",
-                                type=['png', 'jpg', 'jpeg', 'gif', 'svg'],
-                                help="Upload a logo image file (PNG, JPG, GIF, or SVG). Recommended size: max 200px width, 100px height.",
-                                key=f"logo_upload_{selected_company_id}"
-                            )
+                        # Use form to prevent flashing/reruns on every input change
+                        with st.form(f"branding_form_{selected_company_id}", clear_on_submit=False):
+                            # Logo upload section
+                            st.write("**Company Logo:**")
+                            col_upload, col_preview = st.columns([2, 1])
                             
-                            # Manual path input (fallback)
-                            st.caption("Or enter logo path manually:")
-                            company_logo = st.text_input("Logo Path", 
-                                                        value=company_info.get('logo_path', '') or '',
-                                                        help="Path to company logo (e.g., 'static/htc_logo.png'). Leave empty to use global logo.",
-                                                        key=f"company_logo_{selected_company_id}")
-                        
-                        with col_preview:
-                            # Show current logo if exists
-                            current_logo_path = company_info.get('logo_path')
-                            if current_logo_path:
-                                _base_dir = os.path.dirname(os.path.abspath(__file__))
-                                _test_logo_path = os.path.join(_base_dir, current_logo_path)
-                                if os.path.exists(_test_logo_path):
-                                    try:
-                                        st.write("**Current Logo:**")
-                                        st.image(_test_logo_path, width=150)
-                                    except Exception:
-                                        st.info("Logo file exists but cannot be displayed")
+                            with col_upload:
+                                uploaded_logo = st.file_uploader(
+                                    "Upload Company Logo",
+                                    type=['png', 'jpg', 'jpeg', 'gif', 'svg'],
+                                    help="Upload a logo image file (PNG, JPG, GIF, or SVG). Recommended size: max 200px width, 100px height.",
+                                    key=f"logo_upload_{selected_company_id}"
+                                )
+                                
+                                # Manual path input (fallback)
+                                st.caption("Or enter logo path manually:")
+                                company_logo = st.text_input("Logo Path", 
+                                                            value=company_info.get('logo_path', '') or '',
+                                                            help="Path to company logo (e.g., 'static/htc_logo.png'). Leave empty to use global logo.",
+                                                            key=f"company_logo_{selected_company_id}")
                             
-                            # Show preview of uploaded logo
-                            if uploaded_logo:
-                                st.write("**Preview:**")
-                                st.image(uploaded_logo, width=150)
-                        
-                        # Colors
-                        company_bg = st.color_picker("Background Color", 
-                                                     value=company_info.get('background_color') or '#E9F7EF',
-                                                     help="Company-specific background color. Leave as default to use global color.",
-                                                     key=f"company_bg_{selected_company_id}")
-                        company_btn = st.color_picker("Button Color", 
-                                                      value=company_info.get('button_color') or '#17A2B8',
-                                                      help="Company-specific button color. Leave as default to use global color.",
-                                                      key=f"company_btn_{selected_company_id}")
-                        
-                        if st.button("💾 Save Branding", key=f"save_branding_{selected_company_id}"):
-                            # Handle logo upload
-                            final_logo_path = company_logo  # Default to manual path
-                            
-                            if uploaded_logo:
-                                # Save uploaded file
-                                try:
+                            with col_preview:
+                                # Show current logo if exists
+                                current_logo_path = company_info.get('logo_path')
+                                if current_logo_path:
                                     _base_dir = os.path.dirname(os.path.abspath(__file__))
-                                    static_dir = os.path.join(_base_dir, "static")
-                                    os.makedirs(static_dir, exist_ok=True)
-                                    
-                                    # Generate filename based on company ID and original filename
-                                    file_ext = os.path.splitext(uploaded_logo.name)[1].lower()
-                                    logo_filename = f"company_{selected_company_id}_logo{file_ext}"
-                                    logo_path = os.path.join(static_dir, logo_filename)
-                                    
-                                    # Save the file
-                                    with open(logo_path, "wb") as f:
-                                        f.write(uploaded_logo.getbuffer())
-                                    
-                                    # Set the relative path
-                                    final_logo_path = f"static/{logo_filename}"
-                                    st.success(f"✅ Logo uploaded successfully!")
-                                except Exception as e:
-                                    st.error(f"❌ Error uploading logo: {str(e)}")
-                                    final_logo_path = company_logo  # Fall back to manual path
+                                    _test_logo_path = os.path.join(_base_dir, current_logo_path)
+                                    if os.path.exists(_test_logo_path):
+                                        try:
+                                            st.write("**Current Logo:**")
+                                            st.image(_test_logo_path, width=150)
+                                        except Exception:
+                                            st.info("Logo file exists but cannot be displayed")
+                                
+                                # Show preview of uploaded logo
+                                if uploaded_logo:
+                                    st.write("**Preview:**")
+                                    st.image(uploaded_logo, width=150)
                             
-                            # Update company with branding
-                            companies = get_all_companies()
-                            for company in companies:
-                                if company.get('id') == selected_company_id:
-                                    company['logo_path'] = final_logo_path if final_logo_path else None
-                                    company['background_color'] = company_bg if company_bg != '#E9F7EF' else None
-                                    company['button_color'] = company_btn if company_btn != '#17A2B8' else None
-                                    # Save companies
-                                    from shared_utils.data_manager import _load_json_file, _save_json_file, COMPANIES_FILE
-                                    _save_json_file(COMPANIES_FILE, companies)
-                                    st.success("✅ Company branding updated!")
-                                    st.rerun()
+                            # Colors - use session state to prevent reruns
+                            bg_key = f"company_bg_{selected_company_id}"
+                            btn_key = f"company_btn_{selected_company_id}"
+                            
+                            # Initialize session state if not exists
+                            if bg_key not in st.session_state:
+                                st.session_state[bg_key] = company_info.get('background_color') or '#E9F7EF'
+                            if btn_key not in st.session_state:
+                                st.session_state[btn_key] = company_info.get('button_color') or '#17A2B8'
+                            
+                            company_bg = st.color_picker("Background Color", 
+                                                         value=st.session_state[bg_key],
+                                                         help="Company-specific background color. Leave as default to use global color.",
+                                                         key=f"company_bg_picker_{selected_company_id}")
+                            company_btn = st.color_picker("Button Color", 
+                                                          value=st.session_state[btn_key],
+                                                          help="Company-specific button color. Leave as default to use global color.",
+                                                          key=f"company_btn_picker_{selected_company_id}")
+                            
+                            submitted = st.form_submit_button("💾 Save Branding", use_container_width=True)
+                            
+                            if submitted:
+                                # Handle logo upload
+                                final_logo_path = company_logo  # Default to manual path
+                                
+                                if uploaded_logo:
+                                    # Save uploaded file
+                                    try:
+                                        _base_dir = os.path.dirname(os.path.abspath(__file__))
+                                        static_dir = os.path.join(_base_dir, "static")
+                                        os.makedirs(static_dir, exist_ok=True)
+                                        
+                                        # Generate filename based on company ID and original filename
+                                        file_ext = os.path.splitext(uploaded_logo.name)[1].lower()
+                                        logo_filename = f"company_{selected_company_id}_logo{file_ext}"
+                                        logo_path = os.path.join(static_dir, logo_filename)
+                                        
+                                        # Save the file
+                                        with open(logo_path, "wb") as f:
+                                            f.write(uploaded_logo.getbuffer())
+                                        
+                                        # Set the relative path
+                                        final_logo_path = f"static/{logo_filename}"
+                                    except Exception as e:
+                                        st.error(f"❌ Error uploading logo: {str(e)}")
+                                        final_logo_path = company_logo  # Fall back to manual path
+                                
+                                # Update company with branding
+                                companies = get_all_companies()
+                                for company in companies:
+                                    if company.get('id') == selected_company_id:
+                                        company['logo_path'] = final_logo_path if final_logo_path else None
+                                        company['background_color'] = company_bg if company_bg != '#E9F7EF' else None
+                                        company['button_color'] = company_btn if company_btn != '#17A2B8' else None
+                                        # Save companies
+                                        from shared_utils.data_manager import _load_json_file, _save_json_file, COMPANIES_FILE
+                                        _save_json_file(COMPANIES_FILE, companies)
+                                        
+                                        # Update session state
+                                        st.session_state[bg_key] = company_bg
+                                        st.session_state[btn_key] = company_btn
+                                
+                                st.success("✅ Company branding updated!")
+                                st.rerun()
                         
                         # Show company users
                         st.divider()
@@ -462,42 +479,49 @@ elif page == "Company Management":
                         
                         with col2:
                             st.subheader("Update Subscription")
-                            sub_key = f"sub_type_{selected_company_id}"
-                            if sub_key not in st.session_state:
-                                st.session_state[sub_key] = company_info.get('subscription_type', 'monthly')
-                            
-                            new_sub_type = st.selectbox("Subscription Type", ["monthly", "annual"],
-                                                       index=0 if st.session_state[sub_key] == 'monthly' else 1,
-                                                       key=f"sub_select_{selected_company_id}")
-                            
-                            start_date_str = company_info.get('start_date', datetime.now().isoformat())
-                            if 'T' in start_date_str:
-                                start_date_val = datetime.fromisoformat(start_date_str.split('T')[0]).date()
-                            else:
-                                start_date_val = datetime.fromisoformat(start_date_str).date()
-                            
-                            exp_date_str = company_info.get('expiration_date', datetime.now().isoformat())
-                            if 'T' in exp_date_str:
-                                exp_date_val = datetime.fromisoformat(exp_date_str.split('T')[0]).date()
-                            else:
-                                exp_date_val = datetime.fromisoformat(exp_date_str).date()
-                            
-                            new_start = st.date_input("Start Date", value=start_date_val, key=f"start_date_{selected_company_id}")
-                            new_expiration = st.date_input("Expiration Date", value=exp_date_val, key=f"exp_date_{selected_company_id}")
-                            
-                            if st.button("Update Subscription", key=f"sub_btn_{selected_company_id}"):
-                                if (new_sub_type != company_info.get('subscription_type') or 
-                                    new_start.isoformat() != start_date_str.split('T')[0] or
-                                    new_expiration.isoformat() != exp_date_str.split('T')[0]):
-                                    success, message = update_company_subscription(
-                                        selected_company_id, new_sub_type, 
-                                        new_start.isoformat(), new_expiration.isoformat()
-                                    )
-                                    if success:
-                                        st.success(message)
-                                        st.session_state[sub_key] = new_sub_type
+                            # Use form to prevent reruns on every input change
+                            with st.form(f"subscription_form_{selected_company_id}"):
+                                sub_key = f"sub_type_{selected_company_id}"
+                                if sub_key not in st.session_state:
+                                    st.session_state[sub_key] = company_info.get('subscription_type', 'monthly')
+                                
+                                new_sub_type = st.selectbox("Subscription Type", ["monthly", "annual"],
+                                                           index=0 if st.session_state[sub_key] == 'monthly' else 1,
+                                                           key=f"sub_select_{selected_company_id}")
+                                
+                                start_date_str = company_info.get('start_date', datetime.now().isoformat())
+                                if 'T' in start_date_str:
+                                    start_date_val = datetime.fromisoformat(start_date_str.split('T')[0]).date()
+                                else:
+                                    start_date_val = datetime.fromisoformat(start_date_str).date()
+                                
+                                exp_date_str = company_info.get('expiration_date', datetime.now().isoformat())
+                                if 'T' in exp_date_str:
+                                    exp_date_val = datetime.fromisoformat(exp_date_str.split('T')[0]).date()
+                                else:
+                                    exp_date_val = datetime.fromisoformat(exp_date_str).date()
+                                
+                                new_start = st.date_input("Start Date", value=start_date_val, key=f"start_date_{selected_company_id}")
+                                new_expiration = st.date_input("Expiration Date", value=exp_date_val, key=f"exp_date_{selected_company_id}")
+                                
+                                submitted_sub = st.form_submit_button("Update Subscription", use_container_width=True)
+                                
+                                if submitted_sub:
+                                    if (new_sub_type != company_info.get('subscription_type') or 
+                                        new_start.isoformat() != start_date_str.split('T')[0] or
+                                        new_expiration.isoformat() != exp_date_str.split('T')[0]):
+                                        success, message = update_company_subscription(
+                                            selected_company_id, new_sub_type, 
+                                            new_start.isoformat(), new_expiration.isoformat()
+                                        )
+                                        if success:
+                                            st.success(message)
+                                            st.session_state[sub_key] = new_sub_type
+                                            st.rerun()
+                                        else:
+                                            st.error(message)
                                     else:
-                                        st.error(message)
+                                        st.info("No changes to save")
                         
                         with col3:
                             st.subheader("Delete Company")
