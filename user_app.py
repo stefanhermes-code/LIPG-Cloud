@@ -11,6 +11,7 @@ import json
 import hashlib
 import base64
 import html
+from pathlib import Path
 
 # Ensure we can import from shared_utils when app is at repo root
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -141,13 +142,25 @@ st.markdown(f"""
         .header-container {{
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: space-between;
             gap: 20px;
             margin-bottom: 30px;
             padding: 20px;
             background: white;
             border-radius: 10px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }}
+        .header-content {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            gap: 20px;
+        }}
+        .header-logo-img {{
+            max-height: 100px;
+            max-width: 200px;
+            object-fit: contain;
         }}
         .header-logo {{
             max-height: 100px;
@@ -193,49 +206,29 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 
-# Header with Logo
+# Header with Logo inside container
+logo_html = ""
 if _logo_exists:
     try:
-        col_text, col_logo = st.columns([3, 1])
-        with col_text:
-            st.markdown(f"""
-                <div class="header-text">
-                    <h1>{display_company_name}</h1>
-                    <h2>LinkedIn Post Generator</h2>
-                </div>
-            """, unsafe_allow_html=True)
-        with col_logo:
-            st.image(_logo_path, use_container_width=True)
+        # Read logo and encode to base64 for embedding
+        with open(_logo_path, "rb") as f:
+            logo_data = base64.b64encode(f.read()).decode()
+            logo_ext = os.path.splitext(_logo_path)[1].lower().replace('.', '')
+            logo_html = f'<img src="data:image/{logo_ext};base64,{logo_data}" class="header-logo-img" alt="Logo" />'
     except Exception:
-        # Fallback if logo fails to load
-        st.markdown(f"""
-            <div class="header-container">
-                <div class="header-text">
-                    <h1>{display_company_name}</h1>
-                    <h2>LinkedIn Post Generator</h2>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-else:
-    st.markdown(f"""
-        <div class="header-container">
+        logo_html = ""
+
+st.markdown(f"""
+    <div class="header-container">
+        <div class="header-content">
             <div class="header-text">
                 <h1>{display_company_name}</h1>
                 <h2>LinkedIn Post Generator</h2>
             </div>
+            {logo_html}
         </div>
-    """, unsafe_allow_html=True)
-
-# Instructions section
-with st.expander("📖 How to Use - Step-by-Step Instructions", expanded=False):
-    # Contact button
-    st.markdown(f"""
-        <div style="text-align: center; margin-top: 20px;">
-            <a href="mailto:shermeshtc@gmail.com" style="background-color: {button_color}; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; display: inline-block; font-weight: 600;">
-                📧 Contact Support
-            </a>
-        </div>
-    """, unsafe_allow_html=True)
+    </div>
+""", unsafe_allow_html=True)
 
 # User Authentication
 if not st.session_state.authenticated:
