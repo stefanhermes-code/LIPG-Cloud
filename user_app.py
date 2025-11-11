@@ -207,16 +207,27 @@ st.markdown(f"""
 
 
 # Header with Logo inside container
-logo_html = ""
+# Use dynamic image loading - logo fetched from file system on each page load
+logo_img_tag = ""
 if _logo_exists:
     try:
-        # Read logo and encode to base64 for embedding
-        with open(_logo_path, "rb") as f:
-            logo_data = base64.b64encode(f.read()).decode()
-            logo_ext = os.path.splitext(_logo_path)[1].lower().replace('.', '')
-            logo_html = f'<img src="data:image/{logo_ext};base64,{logo_data}" class="header-logo-img" alt="Logo" />'
-    except Exception:
-        logo_html = ""
+        # Convert absolute path to relative path for web access
+        _base_dir = os.path.dirname(os.path.abspath(__file__))
+        relative_logo_path = os.path.relpath(_logo_path, _base_dir).replace('\\', '/')
+        
+        # Streamlit serves files from static/ folder at /static/filename
+        # Extract just the filename if it's in static folder
+        if 'static/' in relative_logo_path:
+            logo_filename = os.path.basename(relative_logo_path)
+            # Use Streamlit's static file serving
+            logo_img_tag = f'<img src="/static/{logo_filename}" class="header-logo-img" alt="Logo" onerror="this.style.display=\'none\'" />'
+        else:
+            # For files outside static/, use relative path (may not work in all deployments)
+            logo_img_tag = f'<img src="/{relative_logo_path}" class="header-logo-img" alt="Logo" onerror="this.style.display=\'none\'" />'
+    except Exception as e:
+        import logging
+        logging.warning(f"Could not prepare logo path from {_logo_path}: {str(e)}")
+        logo_img_tag = ""
 
 st.markdown(f"""
     <div class="header-container">
@@ -225,7 +236,7 @@ st.markdown(f"""
                 <h1>{display_company_name}</h1>
                 <h2>LinkedIn Post Generator</h2>
             </div>
-            {logo_html}
+            {logo_img_tag}
         </div>
     </div>
 """, unsafe_allow_html=True)

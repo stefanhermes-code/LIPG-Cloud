@@ -335,11 +335,44 @@ elif page == "Company Management":
                         st.subheader("Company Branding")
                         st.write("💡 Company-specific branding will override global branding for users in this company.")
                         
-                        # Company branding fields
-                        company_logo = st.text_input("Logo Path", 
-                                                    value=company_info.get('logo_path', '') or '',
-                                                    help="Path to company logo (e.g., 'static/htc_logo.png'). Leave empty to use global logo.",
-                                                    key=f"company_logo_{selected_company_id}")
+                        # Logo upload section
+                        st.write("**Company Logo:**")
+                        col_upload, col_preview = st.columns([2, 1])
+                        
+                        with col_upload:
+                            uploaded_logo = st.file_uploader(
+                                "Upload Company Logo",
+                                type=['png', 'jpg', 'jpeg', 'gif', 'svg'],
+                                help="Upload a logo image file (PNG, JPG, GIF, or SVG). Recommended size: max 200px width, 100px height.",
+                                key=f"logo_upload_{selected_company_id}"
+                            )
+                            
+                            # Manual path input (fallback)
+                            st.caption("Or enter logo path manually:")
+                            company_logo = st.text_input("Logo Path", 
+                                                        value=company_info.get('logo_path', '') or '',
+                                                        help="Path to company logo (e.g., 'static/htc_logo.png'). Leave empty to use global logo.",
+                                                        key=f"company_logo_{selected_company_id}")
+                        
+                        with col_preview:
+                            # Show current logo if exists
+                            current_logo_path = company_info.get('logo_path')
+                            if current_logo_path:
+                                _base_dir = os.path.dirname(os.path.abspath(__file__))
+                                _test_logo_path = os.path.join(_base_dir, current_logo_path)
+                                if os.path.exists(_test_logo_path):
+                                    try:
+                                        st.write("**Current Logo:**")
+                                        st.image(_test_logo_path, width=150)
+                                    except Exception:
+                                        st.info("Logo file exists but cannot be displayed")
+                            
+                            # Show preview of uploaded logo
+                            if uploaded_logo:
+                                st.write("**Preview:**")
+                                st.image(uploaded_logo, width=150)
+                        
+                        # Colors
                         company_bg = st.color_picker("Background Color", 
                                                      value=company_info.get('background_color') or '#E9F7EF',
                                                      help="Company-specific background color. Leave as default to use global color.",
@@ -350,11 +383,37 @@ elif page == "Company Management":
                                                       key=f"company_btn_{selected_company_id}")
                         
                         if st.button("💾 Save Branding", key=f"save_branding_{selected_company_id}"):
+                            # Handle logo upload
+                            final_logo_path = company_logo  # Default to manual path
+                            
+                            if uploaded_logo:
+                                # Save uploaded file
+                                try:
+                                    _base_dir = os.path.dirname(os.path.abspath(__file__))
+                                    static_dir = os.path.join(_base_dir, "static")
+                                    os.makedirs(static_dir, exist_ok=True)
+                                    
+                                    # Generate filename based on company ID and original filename
+                                    file_ext = os.path.splitext(uploaded_logo.name)[1].lower()
+                                    logo_filename = f"company_{selected_company_id}_logo{file_ext}"
+                                    logo_path = os.path.join(static_dir, logo_filename)
+                                    
+                                    # Save the file
+                                    with open(logo_path, "wb") as f:
+                                        f.write(uploaded_logo.getbuffer())
+                                    
+                                    # Set the relative path
+                                    final_logo_path = f"static/{logo_filename}"
+                                    st.success(f"✅ Logo uploaded successfully!")
+                                except Exception as e:
+                                    st.error(f"❌ Error uploading logo: {str(e)}")
+                                    final_logo_path = company_logo  # Fall back to manual path
+                            
                             # Update company with branding
                             companies = get_all_companies()
                             for company in companies:
                                 if company.get('id') == selected_company_id:
-                                    company['logo_path'] = company_logo if company_logo else None
+                                    company['logo_path'] = final_logo_path if final_logo_path else None
                                     company['background_color'] = company_bg if company_bg != '#E9F7EF' else None
                                     company['button_color'] = company_btn if company_btn != '#17A2B8' else None
                                     # Save companies
