@@ -343,6 +343,39 @@ def _sync_to_github(filepath):
         logging.error(f"Error syncing to GitHub: {str(e)}")
         return False
 
+def sync_logo_to_github(logo_path):
+    """
+    Sync a logo file to GitHub.
+    
+    Args:
+        logo_path: Path to the logo file (can be absolute or relative)
+    
+    Returns:
+        bool: True if sync was successful, False otherwise
+    """
+    try:
+        # Convert to Path object if it's a string
+        if isinstance(logo_path, str):
+            # If relative path, make it relative to base dir
+            if not os.path.isabs(logo_path):
+                logo_path = _base_dir / logo_path
+            else:
+                logo_path = Path(logo_path)
+        else:
+            logo_path = Path(logo_path)
+        
+        # Check if file exists
+        if not logo_path.exists():
+            logging.warning(f"Logo file does not exist: {logo_path}")
+            return False
+        
+        # Sync to GitHub
+        logging.info(f"Syncing logo file to GitHub: {logo_path}")
+        return _sync_to_github(logo_path)
+    except Exception as e:
+        logging.error(f"Error syncing logo to GitHub: {str(e)}")
+        return False
+
 def save_post_to_database(user_id, topic, purpose, audience, message, tone_intensity, 
                           language_style, post_length, formatting, cta, post_goal, generated_post):
     """Save a generated post to the database"""
