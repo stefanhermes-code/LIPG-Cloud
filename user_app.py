@@ -345,16 +345,40 @@ with col1:
     topic = st.text_input(
         "Topic *",
         placeholder="e.g., AI in Healthcare",
-        help="The main subject of your LinkedIn post",
-        key=f"topic_{reset_key}"
+        help="The main subject of your LinkedIn post (max 200 characters)",
+        key=f"topic_{reset_key}",
+        max_chars=200
     )
+    
+    # Real-time validation for topic
+    if topic:
+        if len(topic.strip()) < 3:
+            st.warning("⚠️ Topic should be at least 3 characters")
+        elif len(topic) > 200:
+            st.error(f"⚠️ Topic exceeds 200 characters ({len(topic)}/200)")
+        else:
+            st.success(f"✓ {len(topic)}/200 characters")
     
     purpose = st.text_area(
         "Purpose *",
         placeholder="e.g., To inform professionals about AI applications in healthcare",
-        help="What do you want to achieve with this post?",
-        key=f"purpose_{reset_key}"
+        help="What do you want to achieve with this post? (max 300 characters)",
+        key=f"purpose_{reset_key}",
+        max_chars=300
     )
+    
+    # Real-time validation for purpose
+    if purpose:
+        if len(purpose.strip()) < 10:
+            st.warning("⚠️ Purpose should be at least 10 characters for better results")
+        elif len(purpose) > 300:
+            st.error(f"⚠️ Purpose exceeds 300 characters ({len(purpose)}/300)")
+        else:
+            remaining = 300 - len(purpose)
+            if remaining < 50:
+                st.info(f"📊 {len(purpose)}/300 characters ({remaining} remaining)")
+            else:
+                st.success(f"✓ {len(purpose)}/300 characters")
     
     audience = st.selectbox(
         "Target Audience",
@@ -367,9 +391,23 @@ with col1:
     message = st.text_area(
         "Key Message *",
         placeholder="e.g., AI is transforming healthcare delivery",
-        help="The main message you want to convey",
-        key=f"message_{reset_key}"
+        help="The main message you want to convey (max 1000 characters)",
+        key=f"message_{reset_key}",
+        max_chars=1000
     )
+    
+    # Real-time validation for message
+    if message:
+        if len(message.strip()) < 10:
+            st.warning("⚠️ Key message should be at least 10 characters")
+        elif len(message) > 1000:
+            st.error(f"⚠️ Key message exceeds 1000 characters ({len(message)}/1000)")
+        else:
+            remaining = 1000 - len(message)
+            if remaining < 100:
+                st.info(f"📊 {len(message)}/1000 characters ({remaining} remaining)")
+            else:
+                st.success(f"✓ {len(message)}/1000 characters")
     
     post_goal = st.selectbox(
         "Post Goal",
@@ -435,9 +473,17 @@ with col2:
     cta = st.text_input(
         "Call-to-Action (Optional)",
         placeholder="e.g., What are your thoughts?",
-        help="Optional call-to-action for your post",
-        key=f"cta_{reset_key}"
+        help="Optional call-to-action for your post (max 200 characters)",
+        key=f"cta_{reset_key}",
+        max_chars=200
     )
+    
+    # Real-time validation for CTA
+    if cta:
+        if len(cta) > 200:
+            st.error(f"⚠️ CTA exceeds 200 characters ({len(cta)}/200)")
+        else:
+            st.info(f"📊 {len(cta)}/200 characters")
 
 # Generate button
 st.divider()
@@ -478,7 +524,15 @@ if generate_button and not st.session_state.generating:
                     )
                     
                     if post.startswith("⚠️"):
+                        # Display enhanced error messages with better formatting
                         st.error(post)
+                        # Add helpful tips for common errors
+                        if "Rate Limit" in post:
+                            st.info("💡 **Tip:** Wait a moment and try again. The system will process your request shortly.")
+                        elif "Connection" in post:
+                            st.info("💡 **Tip:** Check your internet connection and try again.")
+                        elif "Quota" in post or "billing" in post.lower():
+                            st.warning("⚠️ **Action Required:** Please contact your administrator about API quota limits.")
                         st.session_state.generating = False
                     else:
                         st.session_state.generated_post = post
