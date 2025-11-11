@@ -178,35 +178,59 @@ def generate_ai_post(topic, purpose, audience, message, tone_intensity, language
         character_guidance = length_mappings.get(post_length, "800-1,500 characters")
         
         # Build enhanced prompt with template
-        prompt = f"""
-        Write a {template['name'].lower()} LinkedIn post about {topic}. 
+        # Enhanced prompt with better structure and guidance
+        cta_instruction = f"Include a clear call-to-action: {cta}" if cta else "End with an engaging call-to-action that encourages interaction (questions, comments, or shares)."
         
-        Purpose: {purpose}
-        Target audience: {audience}
-        Key message: {message}
-        Tone: {tone_intensity} {language_style}
-        Post length: {character_guidance} (LinkedIn limit: 3,000 characters max)
-        Post structure: {formatting}
-        Call-to-action: {cta}
-        Post goal: {post_goal}
+        tone_guidance = {
+            "Very Light": "subtle, gentle, understated",
+            "Light": "pleasant, friendly, approachable",
+            "Moderate": "balanced, professional, engaging",
+            "Strong": "confident, assertive, impactful",
+            "Very Strong": "powerful, compelling, commanding"
+        }.get(tone_intensity, "professional and engaging")
         
-        {template['formatting_style']}
+        formatting_instructions = {
+            "Bullet Points": "Use bullet points (•) for key takeaways. Make each point concise and impactful.",
+            "Numbered List": "Use numbered steps or points (1., 2., 3.). Create a logical sequence.",
+            "Paragraphs": "Use flowing paragraph format with smooth transitions between ideas.",
+            "Mixed Format": "Combine bullets, paragraphs, and lists strategically for maximum engagement.",
+            "Question & Answer": "Use Q&A format with engaging questions that spark discussion."
+        }.get(formatting, "Use a clear, structured format.")
         
-        Structure the post using: {formatting}
-        - If "Bullet Points": Use bullet points for key takeaways
-        - If "Numbered List": Use numbered steps or points
-        - If "Paragraphs": Use flowing paragraph format
-        - If "Mixed Format": Combine bullets, paragraphs, and lists strategically
-        - If "Question & Answer": Use Q&A format with engaging questions
-        
-        Use LinkedIn-friendly formatting:
-        - CAPITALIZATION for emphasis
-        - Emojis for engagement
-        - Clear structure and flow
-        - Line breaks for readability
-        
-        IMPORTANT: Keep the post within the specified character range. LinkedIn has a 3,000 character limit.
-        """
+        prompt = f"""Create a compelling {template['name'].lower()} LinkedIn post about: {topic}
+
+CONTEXT:
+- Purpose: {purpose}
+- Target Audience: {audience}
+- Key Message: {message}
+- Post Goal: {post_goal}
+
+STYLE REQUIREMENTS:
+- Tone: {tone_guidance} with a {language_style.lower()} language style
+- Length: {character_guidance} (LinkedIn maximum: 3,000 characters)
+- Format: {formatting_instructions}
+
+CONTENT GUIDELINES:
+{template['formatting_style']}
+
+- Start with a hook that grabs attention (question, bold statement, or relatable scenario)
+- Develop the main message clearly and concisely
+- Use LinkedIn-optimized formatting:
+  • Strategic CAPITALIZATION for emphasis on key points
+  • Relevant emojis (2-4 max) to enhance readability and engagement
+  • Clear line breaks between sections for easy scanning
+  • Short paragraphs (2-3 sentences max) for mobile readability
+- {cta_instruction}
+
+QUALITY STANDARDS:
+- Professional yet approachable
+- Actionable insights or value
+- Authentic voice that resonates with {audience.lower()}
+- Engaging and shareable content
+- No hashtags unless specifically requested
+
+CRITICAL: The post must be exactly within {character_guidance}. Do not exceed 3,000 characters total.
+"""
         
         client = get_openai_client()
         response = client.chat.completions.create(
@@ -220,24 +244,86 @@ def generate_ai_post(topic, purpose, audience, message, tone_intensity, language
         
         post_content = response.choices[0].message.content.strip()
         
+        # Validate post length
+        if len(post_content) > 3000:
+            logging.warning(f"Generated post exceeds 3000 characters ({len(post_content)} chars). Truncating...")
+            post_content = post_content[:2997] + "..."
+        
+        # Check if post is too short (might indicate an error)
+        if len(post_content) < 50:
+            logging.warning(f"Generated post is very short ({len(post_content)} chars). This might indicate an issue.")
+        
         # Generate visual prompt for the post
         visual_prompt = generate_visual_prompt(topic, purpose, audience, post_goal, template_type, visual_style)
         
         return post_content, visual_prompt
         
     except RateLimitError:
+        error_msg = (
+            "⚠️ **Rate Limit Exceeded**\n\n"
+            "The AI service is temporarily busy. Please:\n"
+            "• Wait 30-60 seconds and try again\n"
+            "• Check if you have API usage limits\n"
+            "• Contact support if this persists"
+        )
         logging.error("OpenAI API rate limit exceeded")
-        return "⚠️ Rate limit exceeded. Please wait a moment and try again.", ""
+        return error_msg, ""
     except APIConnectionError:
+        error_msg = (
+            "⚠️ **Connection Error**\n\n"
+            "Unable to connect to the AI service. Please:\n"
+            "• Check your internet connection\n"
+            "• Verify your network settings\n"
+            "• Try again in a few moments"
+        )
         logging.error("OpenAI API connection error")
-        return "⚠️ Connection error. Please check your internet connection and try again.", ""
+        return error_msg, ""
     except APIError as e:
-        logging.error(f"OpenAI API error: {str(e)}")
-        return f"⚠️ API error: {str(e)}", ""
+        error_code = getattr(e, 'code', None)
+        error_type = getattr(e, 'type', 'Unknown')
+        
+        if 'insufficient_quota' in str(e).lower() or 'billing' in str(e).lower():
+            error_msg = (
+                "⚠️ **API Quota Exceeded**\n\n"
+                "The API quota has been exceeded. Please:\n"
+                "• Check your OpenAI account billing\n"
+                "• Contact your administrator\n"
+                "• Try again later"
+            )
+        elif 'invalid_api_key' in str(e).lower():
+            error_msg = (
+                "⚠️ **API Configuration Error**\n\n"
+                "The API key is invalid or missing. Please:\n"
+                "• Contact your administrator\n"
+                "• Verify API configuration"
+            )
+        else:
+            error_msg = (
+                f"⚠️ **API Error**\n\n"
+                f"An error occurred: {str(e)[:200]}\n\n"
+                f"Error Type: {error_type}\n"
+                f"Please try again or contact support if the issue persists."
+            )
+        logging.error(f"OpenAI API error: {str(e)} (Code: {error_code}, Type: {error_type})")
+        return error_msg, ""
     except ValueError as e:
+        error_msg = (
+            f"⚠️ **Input Validation Error**\n\n"
+            f"{str(e)}\n\n"
+            f"Please check your input and try again."
+        )
         logging.error(f"Input validation error: {str(e)}")
-        return f"⚠️ {str(e)}", ""
+        return error_msg, ""
     except Exception as e:
-        logging.error(f"Unexpected error generating AI post: {str(e)}")
-        return "⚠️ An unexpected error occurred while generating the post. Please try again.", ""
+        error_msg = (
+            "⚠️ **Unexpected Error**\n\n"
+            "An unexpected error occurred while generating your post.\n\n"
+            "Please:\n"
+            "• Try again in a moment\n"
+            "• Check that all required fields are filled\n"
+            "• Contact support if the problem continues\n\n"
+            f"Error details: {type(e).__name__}"
+        )
+        logging.error(f"Unexpected error generating AI post: {str(e)}", exc_info=True)
+        return error_msg, ""
 

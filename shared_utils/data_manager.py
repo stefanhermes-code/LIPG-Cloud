@@ -10,6 +10,8 @@ import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 import logging
+from functools import lru_cache
+from time import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -25,16 +27,73 @@ COMPANIES_FILE = DATA_DIR / "companies.json"  # Company data with subscriptions
 # Ensure data directory exists
 DATA_DIR.mkdir(exist_ok=True)
 
+# Simple cache with TTL (Time To Live) for file-based data
+_file_cache = {}
+_cache_ttl = 30  # Cache for 30 seconds by default
 
-def _load_json_file(filepath):
-    """Load JSON data from file"""
+def _get_file_mtime(filepath):
+    """Get file modification time, return 0 if file doesn't exist"""
+    try:
+        return filepath.stat().st_mtime if filepath.exists() else 0
+    except Exception:
+        return 0
+
+def _is_cache_valid(filepath, cache_entry):
+    """Check if cache entry is still valid based on file modification time"""
+    if cache_entry is None:
+        return False
+    current_mtime = _get_file_mtime(filepath)
+    cached_mtime = cache_entry.get('mtime', 0)
+    return current_mtime == cached_mtime
+
+def _get_cached_data(filepath):
+    """Get cached data if valid, None otherwise"""
+    cache_key = str(filepath.resolve())
+    cache_entry = _file_cache.get(cache_key)
+    
+    if cache_entry and _is_cache_valid(filepath, cache_entry):
+        # Check TTL
+        if time() - cache_entry.get('timestamp', 0) < _cache_ttl:
+            return cache_entry.get('data')
+    
+    return None
+
+def _set_cached_data(filepath, data):
+    """Cache data with file modification time"""
+    cache_key = str(filepath.resolve())
+    _file_cache[cache_key] = {
+        'data': data,
+        'mtime': _get_file_mtime(filepath),
+        'timestamp': time()
+    }
+
+def _invalidate_cache(filepath=None):
+    """Invalidate cache for a specific file or all files"""
+    if filepath:
+        cache_key = str(filepath.resolve())
+        _file_cache.pop(cache_key, None)
+    else:
+        _file_cache.clear()
+
+
+def _load_json_file(filepath, use_cache=True):
+    """Load JSON data from file with optional caching"""
+    # Check cache first
+    if use_cache:
+        cached_data = _get_cached_data(filepath)
+        if cached_data is not None:
+            return cached_data
+    
     if filepath.exists():
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 # Ensure we return a list if data is not a list
                 if not isinstance(data, list):
-                    return []
+                    data = []
+                # Cache the data
+                if use_cache:
+                    _set_cached_data(filepath, data)
                 return data
         except json.JSONDecodeError:
             # If file is corrupted, return empty list
@@ -47,19 +106,25 @@ def _load_json_file(filepath):
         # File doesn't exist - create empty file
         logging.info(f"File {filepath} doesn't exist, creating empty file")
         try:
-            _save_json_file(filepath, [])
+            _save_json_file(filepath, [], use_cache=False)
         except Exception as e:
             logging.error(f"Error creating {filepath}: {str(e)}")
         return []
 
-def _save_json_file(filepath, data):
-    """Save JSON data to file"""
+def _save_json_file(filepath, data, use_cache=True):
+    """Save JSON data to file and invalidate cache"""
     try:
         # Ensure directory exists
         filepath.parent.mkdir(parents=True, exist_ok=True)
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
         logging.info(f"Successfully saved {filepath}")
+        
+        # Invalidate cache for this file
+        if use_cache:
+            _invalidate_cache(filepath)
+            # Update cache with new data
+            _set_cached_data(filepath, data)
         
         # Sync to GitHub if token is available and file should be tracked
         # Compare using resolved paths to handle symlinks and different path formats
