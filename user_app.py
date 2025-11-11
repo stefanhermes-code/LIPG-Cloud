@@ -224,7 +224,12 @@ st.markdown(f"""
 # - os.path.exists() works correctly because files are in the GitHub repo
 # - All logos should be in static/ folder and committed to GitHub
 logo_img_tag = ""
-if _logo_exists:
+
+# Always try to show logo, especially on login screen (before authentication)
+# For login screen, always attempt to show LIPG logo even if file check fails
+is_login_screen = not st.session_state.get('authenticated', False)
+
+if _logo_exists or is_login_screen:
     try:
         # Get relative path from app root
         relative_logo_path = os.path.relpath(_logo_path, _base_dir).replace('\\', '/')
@@ -244,7 +249,11 @@ if _logo_exists:
     except Exception as e:
         import logging
         logging.warning(f"Could not prepare logo path from {_logo_path}: {str(e)}")
-        logo_img_tag = ""
+        # On login screen, always try to show default logo even if path resolution fails
+        if is_login_screen:
+            logo_img_tag = '<img src="/static/logo.png" class="header-logo-img" alt="Logo" onerror="this.style.display=\'none\'" />'
+        else:
+            logo_img_tag = ""
 
 st.markdown(f"""
     <div class="header-container">
