@@ -384,10 +384,12 @@ elif page == "Company Management":
                             if btn_key not in st.session_state:
                                 st.session_state[btn_key] = company_info.get('button_color') or '#17A2B8'
                             
+                            # Color pickers inside form - form prevents reruns until submit
                             company_bg = st.color_picker("Background Color", 
                                                          value=st.session_state[bg_key],
                                                          help="Company-specific background color. Leave as default to use global color.",
                                                          key=f"company_bg_picker_{selected_company_id}")
+                            
                             company_btn = st.color_picker("Button Color", 
                                                           value=st.session_state[btn_key],
                                                           help="Company-specific button color. Leave as default to use global color.",
@@ -419,12 +421,17 @@ elif page == "Company Management":
                                         final_logo_path = f"static/{logo_filename}"
                                         
                                         # Sync logo file to GitHub
-                                        from shared_utils.data_manager import sync_logo_to_github
-                                        sync_success = sync_logo_to_github(logo_path)
-                                        if sync_success:
-                                            st.success(f"✅ Logo saved and synced to GitHub: {final_logo_path}")
-                                        else:
-                                            st.warning(f"⚠️ Logo saved to: {final_logo_path}, but GitHub sync failed. Please commit manually.")
+                                        try:
+                                            from shared_utils.data_manager import sync_logo_to_github
+                                            sync_success = sync_logo_to_github(logo_path)
+                                            if sync_success:
+                                                st.success(f"✅ Logo saved and synced to GitHub: {final_logo_path}")
+                                            else:
+                                                st.warning(f"⚠️ Logo saved to: {final_logo_path}, but GitHub sync failed. Please commit manually.")
+                                                st.info("💡 For Streamlit Cloud, the logo file must be in GitHub. You may need to commit it manually.")
+                                        except Exception as sync_error:
+                                            # If sync fails, still show the file was saved
+                                            st.warning(f"⚠️ Logo saved to: {final_logo_path}, but GitHub sync failed: {str(sync_error)}")
                                             st.info("💡 For Streamlit Cloud, the logo file must be in GitHub. You may need to commit it manually.")
                                     except Exception as e:
                                         st.error(f"❌ Error uploading logo: {str(e)}")
