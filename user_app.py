@@ -219,22 +219,27 @@ st.markdown(f"""
 
 
 # Header with Logo inside container
-# Use dynamic image loading - logo fetched from file system on each page load
+# IMPORTANT: For Streamlit Cloud deployments from GitHub:
+# - Files in static/ folder in GitHub are automatically served at /static/filename
+# - os.path.exists() works correctly because files are in the GitHub repo
+# - All logos should be in static/ folder and committed to GitHub
 logo_img_tag = ""
 if _logo_exists:
     try:
-        # Convert absolute path to relative path for web access
-        _base_dir = os.path.dirname(os.path.abspath(__file__))
+        # Get relative path from app root
         relative_logo_path = os.path.relpath(_logo_path, _base_dir).replace('\\', '/')
         
-        # Streamlit serves files from static/ folder at /static/filename
-        # Extract just the filename if it's in static folder
-        if 'static/' in relative_logo_path:
+        # In Streamlit Cloud (deployed from GitHub), static/ folder files are served at /static/filename
+        if relative_logo_path.startswith('static/'):
+            # Extract just the filename for Streamlit Cloud static serving
+            # Example: static/logo.png -> /static/logo.png
+            # Example: static/company_1_logo.png -> /static/company_1_logo.png
             logo_filename = os.path.basename(relative_logo_path)
-            # Use Streamlit's static file serving
+            # Streamlit Cloud automatically serves files from static/ at /static/filename
             logo_img_tag = f'<img src="/static/{logo_filename}" class="header-logo-img" alt="Logo" onerror="this.style.display=\'none\'" />'
         else:
-            # For files outside static/, use relative path (may not work in all deployments)
+            # For files outside static/, try relative path (may need adjustment for Streamlit Cloud)
+            # Note: It's recommended to keep all logos in static/ folder
             logo_img_tag = f'<img src="/{relative_logo_path}" class="header-logo-img" alt="Logo" onerror="this.style.display=\'none\'" />'
     except Exception as e:
         import logging
