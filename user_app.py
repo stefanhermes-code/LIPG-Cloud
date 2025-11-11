@@ -65,25 +65,60 @@ try:
     customer_name = customer_config.get('customer_name', 'LinkedIn Post Generator')
     background_color = customer_config.get('background_color', '#E9F7EF')
     button_color = customer_config.get('button_color', '#17A2B8')
+    # Get customer-specific logo path from config, or use default
+    configured_logo_path = customer_config.get('logo_path', 'static/logo.png')
 except Exception as e:
     st.error(f"Error loading configuration: {str(e)}")
     customer_name = "LinkedIn Post Generator"
     background_color = '#E9F7EF'
     button_color = '#17A2B8'
+    configured_logo_path = 'static/logo.png'
 
-# Get logo path
+# Get company name and branding for logged-in user
+display_company_name = customer_name  # Default to global customer name
+company_logo_path = configured_logo_path  # Default to global logo
+company_bg_color = background_color  # Default to global background
+company_button_color = button_color  # Default to global button color
+
+if st.session_state.get('authenticated') and st.session_state.get('username'):
+    try:
+        user_info = get_user(st.session_state.username)
+        if user_info and user_info.get('company_id'):
+            company_info = get_company(user_info.get('company_id'))
+            if company_info:
+                display_company_name = company_info.get('name', customer_name)
+                # Use company-specific branding if available, otherwise use global
+                if company_info.get('logo_path'):
+                    company_logo_path = company_info.get('logo_path')
+                if company_info.get('background_color'):
+                    company_bg_color = company_info.get('background_color')
+                if company_info.get('button_color'):
+                    company_button_color = company_info.get('button_color')
+    except Exception:
+        # If error getting company, use default
+        pass
+
+# Get logo path - use company logo if available, otherwise customer logo, otherwise default
 _base_dir = os.path.dirname(os.path.abspath(__file__))
-_logo_path = os.path.join(_base_dir, "static", "logo.png")
+_logo_path = os.path.join(_base_dir, company_logo_path)
 _logo_exists = os.path.exists(_logo_path)
 
-# Custom CSS
+# Fallback chain: company logo -> customer logo -> default logo
+if not _logo_exists:
+    _logo_path = os.path.join(_base_dir, configured_logo_path)
+    _logo_exists = os.path.exists(_logo_path)
+    if not _logo_exists and configured_logo_path != 'static/logo.png':
+        _logo_path = os.path.join(_base_dir, "static", "logo.png")
+        _logo_exists = os.path.exists(_logo_path)
+
+# Custom CSS - use company branding if available, otherwise global
 st.markdown(f"""
     <style>
         .main {{
-            background-color: {background_color};
+            background-color: {company_bg_color};
         }}
         .stButton > button {{
-            background-color: {button_color};
+            background-color: {company_button_color};
             color: white;
             border-radius: 5px;
             padding: 0.5rem 1rem;
@@ -91,7 +126,7 @@ st.markdown(f"""
             transition: all 0.3s ease;
         }}
         .stButton > button:hover {{
-            background-color: {button_color}CC;
+            background-color: {company_button_color}CC;
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }}
@@ -119,6 +154,9 @@ st.markdown(f"""
             max-width: 200px;
         }}
         .header-text {{
+            text-align: left;
+        }}
+        .header-text-center {{
             text-align: center;
         }}
         .header-text h1 {{
@@ -137,10 +175,10 @@ st.markdown(f"""
             padding: 20px;
             border-radius: 10px;
             margin-bottom: 20px;
-            border-left: 4px solid {button_color};
+            border-left: 4px solid {company_button_color};
         }}
         .instructions-box h3 {{
-            color: {button_color};
+            color: {company_button_color};
             margin-top: 0;
         }}
         .instructions-box ol {{
@@ -154,25 +192,11 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# Get company name for logged-in user
-display_company_name = customer_name  # Default to global customer name
-if st.session_state.get('authenticated') and st.session_state.get('username'):
-    try:
-        user_info = get_user(st.session_state.username)
-        if user_info and user_info.get('company_id'):
-            company_info = get_company(user_info.get('company_id'))
-            if company_info:
-                display_company_name = company_info.get('name', customer_name)
-    except Exception:
-        # If error getting company, use default
-        pass
 
 # Header with Logo
 if _logo_exists:
     try:
-        col_logo, col_text = st.columns([1, 3])
-        with col_logo:
-            st.image(_logo_path, use_container_width=True)
+        col_text, col_logo = st.columns([3, 1])
         with col_text:
             st.markdown(f"""
                 <div class="header-text">
@@ -180,6 +204,8 @@ if _logo_exists:
                     <h2>LinkedIn Post Generator</h2>
                 </div>
             """, unsafe_allow_html=True)
+        with col_logo:
+            st.image(_logo_path, use_container_width=True)
     except Exception:
         # Fallback if logo fails to load
         st.markdown(f"""

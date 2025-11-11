@@ -71,14 +71,22 @@ try:
     customer_config = load_customer_config()
     customer_name = customer_config.get('customer_name', 'LinkedIn Post Generator')
     button_color = customer_config.get('button_color', '#17A2B8')
+    # Get customer-specific logo path from config, or use default
+    configured_logo_path = customer_config.get('logo_path', 'static/logo.png')
 except Exception as e:
     customer_name = "LinkedIn Post Generator"
     button_color = '#17A2B8'
+    configured_logo_path = 'static/logo.png'
 
-# Get logo path
+# Get logo path - use customer-specific logo if configured, otherwise default
 _base_dir = os.path.dirname(os.path.abspath(__file__))
-_logo_path = os.path.join(_base_dir, "static", "logo.png")
+_logo_path = os.path.join(_base_dir, configured_logo_path)
 _logo_exists = os.path.exists(_logo_path)
+
+# If customer logo doesn't exist, try default logo as fallback
+if not _logo_exists and configured_logo_path != 'static/logo.png':
+    _logo_path = os.path.join(_base_dir, "static", "logo.png")
+    _logo_exists = os.path.exists(_logo_path)
 
 # Custom CSS for Admin
 st.markdown(f"""
@@ -322,6 +330,38 @@ elif page == "Company Management":
                         st.write(f"**Expiration Date:** {company_info.get('expiration_date', 'N/A')}")
                         st.write(f"**Status:** {'✅ Active' if is_subscription_active(selected_company_id) else '❌ Expired'}")
                         st.write(f"**Enabled:** {'✅ Yes' if company_info.get('enabled', True) else '❌ No'}")
+                        
+                        st.divider()
+                        st.subheader("Company Branding")
+                        st.write("💡 Company-specific branding will override global branding for users in this company.")
+                        
+                        # Company branding fields
+                        company_logo = st.text_input("Logo Path", 
+                                                    value=company_info.get('logo_path', '') or '',
+                                                    help="Path to company logo (e.g., 'static/htc_logo.png'). Leave empty to use global logo.",
+                                                    key=f"company_logo_{selected_company_id}")
+                        company_bg = st.color_picker("Background Color", 
+                                                     value=company_info.get('background_color') or '#E9F7EF',
+                                                     help="Company-specific background color. Leave as default to use global color.",
+                                                     key=f"company_bg_{selected_company_id}")
+                        company_btn = st.color_picker("Button Color", 
+                                                      value=company_info.get('button_color') or '#17A2B8',
+                                                      help="Company-specific button color. Leave as default to use global color.",
+                                                      key=f"company_btn_{selected_company_id}")
+                        
+                        if st.button("💾 Save Branding", key=f"save_branding_{selected_company_id}"):
+                            # Update company with branding
+                            companies = get_all_companies()
+                            for company in companies:
+                                if company.get('id') == selected_company_id:
+                                    company['logo_path'] = company_logo if company_logo else None
+                                    company['background_color'] = company_bg if company_bg != '#E9F7EF' else None
+                                    company['button_color'] = company_btn if company_btn != '#17A2B8' else None
+                                    # Save companies
+                                    from shared_utils.data_manager import _load_json_file, _save_json_file, COMPANIES_FILE
+                                    _save_json_file(COMPANIES_FILE, companies)
+                                    st.success("✅ Company branding updated!")
+                                    st.rerun()
                         
                         # Show company users
                         st.divider()
@@ -790,12 +830,29 @@ elif page == "Configuration":
         customer_name = st.text_input("Customer Name", value=config.get('customer_name', ''))
         background_color = st.color_picker("Background Color", value=config.get('background_color', '#E9F7EF'))
         button_color = st.color_picker("Button Color", value=config.get('button_color', '#17A2B8'))
+        logo_path = st.text_input("Logo Path", value=config.get('logo_path', 'static/logo.png'), 
+                                  help="Path to customer logo file (relative to LIPG Cloud folder, e.g., 'static/customer_logo.png')")
+        
+        # Show current logo if it exists
+        if logo_path:
+            _base_dir = os.path.dirname(os.path.abspath(__file__))
+            _test_logo_path = os.path.join(_base_dir, logo_path)
+            if os.path.exists(_test_logo_path):
+                st.success(f"✅ Logo file found at: {logo_path}")
+                try:
+                    st.image(_test_logo_path, width=200)
+                except Exception as e:
+                    st.warning(f"⚠️ Could not display logo: {str(e)}")
+            else:
+                st.warning(f"⚠️ Logo file not found at: {logo_path}")
+                st.info("💡 Place the customer logo file in the specified location, or use 'static/logo.png' for default logo.")
         
         if st.button("💾 Save Configuration"):
             new_config = {
                 'customer_name': customer_name,
                 'background_color': background_color,
-                'button_color': button_color
+                'button_color': button_color,
+                'logo_path': logo_path
             }
             try:
                 save_customer_config(new_config)
