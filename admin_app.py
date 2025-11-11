@@ -418,11 +418,14 @@ elif page == "Company Management":
                                         # Set the relative path
                                         final_logo_path = f"static/{logo_filename}"
                                         
-                                        # Note: For Streamlit Cloud deployments from GitHub:
-                                        # - Logo file is saved to static/ folder
-                                        # - For persistence, commit the logo file to GitHub manually
-                                        # - Or use git commands to sync (logo files are not auto-synced like JSON files)
-                                        st.info(f"💡 Logo saved to: {final_logo_path}. For Streamlit Cloud, commit this file to GitHub for persistence.")
+                                        # Sync logo file to GitHub
+                                        from shared_utils.data_manager import sync_logo_to_github
+                                        sync_success = sync_logo_to_github(logo_path)
+                                        if sync_success:
+                                            st.success(f"✅ Logo saved and synced to GitHub: {final_logo_path}")
+                                        else:
+                                            st.warning(f"⚠️ Logo saved to: {final_logo_path}, but GitHub sync failed. Please commit manually.")
+                                            st.info("💡 For Streamlit Cloud, the logo file must be in GitHub. You may need to commit it manually.")
                                     except Exception as e:
                                         st.error(f"❌ Error uploading logo: {str(e)}")
                                         final_logo_path = company_logo  # Fall back to manual path
